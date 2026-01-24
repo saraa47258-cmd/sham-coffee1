@@ -65,6 +65,8 @@ export default function CashierPage() {
   // Add to existing order mode
   const [addToOrderMode, setAddToOrderMode] = useState(false);
   const [existingOrder, setExistingOrder] = useState<Order | null>(null);
+  /** طلب جديد للغرفة (من تفاصيل الغرفة: متاحة أو محجوزة) */
+  const [newOrderForRoomId, setNewOrderForRoomId] = useState<string | null>(null);
 
   // Responsive handler
   useEffect(() => {
@@ -166,7 +168,6 @@ export default function CashierPage() {
       // If roomId is provided but no orderId, search for pending order for that room
       if (roomId && roomId.trim()) {
         try {
-          console.log('Searching for room order:', roomId);
           const todayOrders = await getTodayPendingOrders();
           const roomOrder = todayOrders.find(o => 
             o.roomId === roomId && 
@@ -177,9 +178,10 @@ export default function CashierPage() {
             setSelectedPendingOrder(roomOrder);
             showToast(`تم تحميل طلب الغرفة #${roomOrder.id.slice(-6).toUpperCase()}`, 'success');
             return;
-          } else {
-            showToast('لا يوجد طلب نشط لهذه الغرفة', 'error');
           }
+          // لا يوجد طلب: وضع "طلب جديد للغرفة" (متاحة أو محجوزة)
+          setNewOrderForRoomId(roomId);
+          showToast('ابدأ طلب جديد للغرفة — اختر الأصناف ثم اطلب أو ادفع', 'success');
         } catch (error) {
           console.error('Error searching room order:', error);
         }
@@ -1041,6 +1043,8 @@ export default function CashierPage() {
             onPlaceOrder={handlePlaceOrder}
             onPayNow={handlePayNow}
             loading={processing}
+            initialRoomId={newOrderForRoomId ?? undefined}
+            initialOrderType={newOrderForRoomId ? 'room' : undefined}
           />
         )}
       </div>

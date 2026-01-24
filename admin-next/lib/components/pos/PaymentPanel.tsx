@@ -25,6 +25,9 @@ interface PaymentPanelProps {
   onPlaceOrder: (order: POSOrder) => void;
   onPayNow: (order: POSOrder, paymentMethod: 'cash' | 'card', receivedAmount: number) => void;
   loading: boolean;
+  /** عند فتح الكاشير من غرفة (طلب جديد أو إضافة طلب) */
+  initialRoomId?: string;
+  initialOrderType?: 'table' | 'room' | 'takeaway';
 }
 
 type ScreenSize = 'mobile' | 'tablet' | 'desktop';
@@ -35,9 +38,13 @@ export default function PaymentPanel({
   rooms, 
   onPlaceOrder, 
   onPayNow,
-  loading 
+  loading,
+  initialRoomId,
+  initialOrderType = 'takeaway',
 }: PaymentPanelProps) {
-  const [orderType, setOrderType] = useState<'table' | 'room' | 'takeaway'>('takeaway');
+  const [orderType, setOrderType] = useState<'table' | 'room' | 'takeaway'>(
+    initialRoomId ? 'room' : initialOrderType
+  );
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [roomGender, setRoomGender] = useState<'male' | 'female' | null>(null);
@@ -110,6 +117,17 @@ export default function PaymentPanel({
     setRoomGender(null);
   }, [selectedRoom?.id]);
 
+  // Pre-select room + order type when opening from room (طلب جديد / إضافة طلب جديد)
+  useEffect(() => {
+    if (!initialRoomId || rooms.length === 0) return;
+    const room = rooms.find((r) => r.id === initialRoomId);
+    if (room) {
+      setOrderType('room');
+      setSelectedTable(null);
+      setSelectedRoom(room);
+    }
+  }, [initialRoomId, rooms]);
+
   // Reset payment panel state when cart is cleared
   useEffect(() => {
     if (items.length === 0) {
@@ -119,12 +137,14 @@ export default function PaymentPanel({
       setDiscountPercent(0);
       setCustomerName('');
       setCustomerPhone('');
-      setOrderType('takeaway');
-      setSelectedTable(null);
-      setSelectedRoom(null);
-      setRoomGender(null);
+      if (!initialRoomId) {
+        setOrderType('takeaway');
+        setSelectedTable(null);
+        setSelectedRoom(null);
+        setRoomGender(null);
+      }
     }
-  }, [items.length]);
+  }, [items.length, initialRoomId]);
 
   const change = paymentMethod === 'cash' && parseFloat(receivedAmount) > totals.total
     ? parseFloat(receivedAmount) - totals.total

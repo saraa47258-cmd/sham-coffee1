@@ -101,10 +101,14 @@ export const getAvailableTables = async (): Promise<Table[]> => {
   return tables.filter(t => t.status === 'available');
 };
 
-// Get available rooms
+// Get available rooms (متاحة + محجوزة — لأخذ طلب جديد)
 export const getAvailableRooms = async (): Promise<Room[]> => {
   const rooms = await getRooms();
-  return rooms.filter(r => r.status === 'available' && r.isActive !== false);
+  return rooms.filter(
+    r =>
+      r.isActive !== false &&
+      (r.status === 'available' || r.status === 'reserved')
+  );
 };
 
 // Create POS Order

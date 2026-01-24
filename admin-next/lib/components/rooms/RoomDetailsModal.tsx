@@ -125,7 +125,7 @@ export default function RoomDetailsModal({
   };
 
   const handleNewOrder = () => {
-    router.push(`/admin/staff-menu?roomId=${room.id}`);
+    router.push(`/admin/cashier?roomId=${room.id}`);
   };
 
   const handlePrint = () => {
@@ -564,30 +564,7 @@ export default function RoomDetailsModal({
           backgroundColor: '#f8fafc',
         }}>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-            {isActive ? (
-              <button
-                onClick={handleSetAvailable}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  padding: '14px',
-                  backgroundColor: '#16a34a',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: '#ffffff',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <Unlock style={{ width: '18px', height: '18px' }} />
-                {activeOrder ? 'إغلاق الطلب وتحرير الغرفة' : 'تحرير الغرفة'}
-              </button>
-            ) : (
+            {room.status === 'available' ? (
               <>
                 <button
                   onClick={() => setShowReserveForm(true)}
@@ -634,6 +611,76 @@ export default function RoomDetailsModal({
                   طلب جديد
                 </button>
               </>
+            ) : room.status === 'reserved' ? (
+              <>
+                <button
+                  onClick={handleSetAvailable}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '14px',
+                    backgroundColor: '#16a34a',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#ffffff',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <Unlock style={{ width: '18px', height: '18px' }} />
+                  تحرير الغرفة
+                </button>
+                <button
+                  onClick={handleNewOrder}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '14px',
+                    backgroundColor: '#6366f1',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <ShoppingBag style={{ width: '18px', height: '18px' }} />
+                  إضافة طلب جديد
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleSetAvailable}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '14px',
+                  backgroundColor: '#16a34a',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: '#ffffff',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <Unlock style={{ width: '18px', height: '18px' }} />
+                إغلاق الطلب وتحرير الغرفة
+              </button>
             )}
           </div>
 
