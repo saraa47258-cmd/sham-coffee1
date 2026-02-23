@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Order, updateOrderStatus } from '@/lib/firebase/database';
+import { useState, useEffect } from 'react';
+import { Order, updateOrderStatus, removeItemFromOrder } from '@/lib/firebase/database';
 import { 
   X, 
   Clock, 
@@ -16,7 +16,8 @@ import {
   CreditCard,
   Banknote,
   DoorOpen,
-  Coffee
+  Coffee,
+  Trash2
 } from 'lucide-react';
 
 interface OrderDetailsDrawerProps {
@@ -24,6 +25,8 @@ interface OrderDetailsDrawerProps {
   isOpen?: boolean;
   onClose: () => void;
   onUpdateStatus?: (orderId: string, status: string) => Promise<void>;
+  /** بعد إلغاء الطلب أو إزالة صنف */
+  onOrderUpdated?: () => void;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: typeof CheckCircle }> = {
@@ -36,12 +39,20 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
   cancelled: { label: 'ملغي', color: '#dc2626', bgColor: '#fee2e2', icon: XCircle },
 };
 
-export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUpdateStatus }: OrderDetailsDrawerProps) {
+export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUpdateStatus, onOrderUpdated }: OrderDetailsDrawerProps) {
   const [updating, setUpdating] = useState(false);
+  const [removingIndex, setRemovingIndex] = useState<number | null>(null);
+  const [localOrder, setLocalOrder] = useState<Order | null>(order);
 
   if (!isOpen || !order) return null;
+  const displayOrder = localOrder ?? order;
+  const canEdit = displayOrder.status !== 'completed' && displayOrder.status !== 'cancelled' && displayOrder.paymentStatus !== 'paid';
 
-  const statusConfig = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+  useEffect(() => {
+    setLocalOrder(order);
+  }, [order?.id, order?.items?.length, order?.total, order?.status]);
+
+  const statusConfig = STATUS_CONFIG[displayOrder.status] || STATUS_CONFIG.pending;
   const StatusIcon = statusConfig.icon;
 
   const formatDate = (dateStr: string) => {
@@ -63,11 +74,35 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
     if (!onUpdateStatus) return;
     setUpdating(true);
     try {
-      await onUpdateStatus(order.id, newStatus);
+      await onUpdateStatus(displayOrder.id, newStatus);
+      onOrderUpdated?.();
+      if (newStatus === 'cancelled') onClose();
     } catch (error) {
       console.error('Error updating status:', error);
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleRemoveItem = async (itemIndex: number) => {
+    if (!canEdit) return;
+    setRemovingIndex(itemIndex);
+    try {
+      await removeItemFromOrder(displayOrder.id, itemIndex);
+      const next = (displayOrder.items || []).filter((_, i) => i !== itemIndex);
+      const newTotal = next.reduce((s, i) => s + (i.itemTotal ?? i.quantity * (i.price || 0)), 0);
+      setLocalOrder({
+        ...displayOrder,
+        items: next,
+        total: newTotal,
+        itemsCount: next.reduce((sum, i) => sum + i.quantity, 0),
+      });
+      onOrderUpdated?.();
+      if (next.length === 0) onClose();
+    } catch (error) {
+      console.error('Error removing item:', error);
+    } finally {
+      setRemovingIndex(null);
     }
   };
 
@@ -132,10 +167,10 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
               </div>
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                  فاتورة #{order.id.slice(-6).toUpperCase()}
+                  فاتورة #{displayOrder.id.slice(-6).toUpperCase()}
                 </h2>
                 <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>
-                  {formatDate(order.createdAt)}
+                  {formatDate(displayOrder.createdAt)}
                 </p>
               </div>
             </div>
@@ -168,7 +203,7 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
             borderRadius: '8px',
           }}>
             <StatusIcon style={{ width: '16px', height: '16px', color: statusConfig.color }} />
-            <span style={{ fontSize: '13px', fontWeight: 600, color: statusConfig.color }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: statusConfig.color }}>
               {statusConfig.label}
             </span>
           </div>
@@ -193,50 +228,50 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <DoorOpen style={{ width: '18px', height: '18px', color: '#64748b' }} />
                 <span style={{ fontSize: '14px', color: '#475569' }}>
-                  {order.orderType === 'table' ? 'طاولة' : order.orderType === 'room' ? 'غرفة' : 'استلام'}
-                  {order.tableNumber && ` رقم ${order.tableNumber}`}
-                  {order.roomNumber && ` رقم ${order.roomNumber}`}
+                  {displayOrder.orderType === 'table' ? 'طاولة' : displayOrder.orderType === 'room' ? 'غرفة' : 'استلام'}
+                  {displayOrder.tableNumber && ` رقم ${displayOrder.tableNumber}`}
+                  {displayOrder.roomNumber && ` رقم ${displayOrder.roomNumber}`}
                 </span>
               </div>
               
               {/* Customer Name */}
-              {order.customerName && (
+              {displayOrder.customerName && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <User style={{ width: '18px', height: '18px', color: '#64748b' }} />
-                  <span style={{ fontSize: '14px', color: '#475569' }}>{order.customerName}</span>
+                  <span style={{ fontSize: '14px', color: '#475569' }}>{displayOrder.customerName}</span>
                 </div>
               )}
               
               {/* Worker */}
-              {order.workerName && (
+              {displayOrder.workerName && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <User style={{ width: '18px', height: '18px', color: '#64748b' }} />
                   <span style={{ fontSize: '14px', color: '#475569' }}>
-                    الموظف: {order.workerName}
+                    الموظف: {displayOrder.workerName}
                   </span>
                 </div>
               )}
 
               {/* Source */}
-              {order.source && (
+              {displayOrder.source && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <MapPin style={{ width: '18px', height: '18px', color: '#64748b' }} />
                   <span style={{ fontSize: '14px', color: '#475569' }}>
-                    المصدر: {order.source === 'cashier' ? 'الكاشير' : order.source === 'staff-menu' ? 'منيو الموظفين' : order.source}
+                    المصدر: {displayOrder.source === 'cashier' ? 'الكاشير' : displayOrder.source === 'staff-menu' ? 'منيو الموظفين' : displayOrder.source}
                   </span>
                 </div>
               )}
 
               {/* Payment Method */}
-              {order.paymentMethod && (
+              {displayOrder.paymentMethod && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {order.paymentMethod === 'cash' ? (
+                  {displayOrder.paymentMethod === 'cash' ? (
                     <Banknote style={{ width: '18px', height: '18px', color: '#64748b' }} />
                   ) : (
                     <CreditCard style={{ width: '18px', height: '18px', color: '#64748b' }} />
                   )}
                   <span style={{ fontSize: '14px', color: '#475569' }}>
-                    {order.paymentMethod === 'cash' ? 'نقدي' : 'بطاقة'}
+                    {displayOrder.paymentMethod === 'cash' ? 'نقدي' : 'بطاقة'}
                   </span>
                 </div>
               )}
@@ -246,7 +281,7 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
           {/* Order Items */}
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{ fontSize: '13px', fontWeight: 600, color: '#94a3b8', marginBottom: '12px', textTransform: 'uppercase' }}>
-              العناصر ({order.items?.length || 0})
+              العناصر ({displayOrder.items?.length || 0})
             </h3>
             <div style={{
               backgroundColor: '#ffffff',
@@ -254,15 +289,16 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
               border: '1px solid #e2e8f0',
               overflow: 'hidden',
             }}>
-              {order.items?.map((item, index) => (
+              {displayOrder.items?.map((item, index) => (
                 <div
                   key={index}
                   style={{
                     padding: '14px 16px',
-                    borderBottom: index < (order.items?.length || 0) - 1 ? '1px solid #f1f5f9' : 'none',
+                    borderBottom: index < (displayOrder.items?.length || 0) - 1 ? '1px solid #f1f5f9' : 'none',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
+                    gap: '12px',
                   }}
                 >
                   <div style={{ flex: 1 }}>
@@ -281,9 +317,29 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
                       </p>
                     )}
                   </div>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
-                    {(item.itemTotal || item.quantity * (item.price || 0)).toFixed(3)} ر.ع
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
+                      {(item.itemTotal || item.quantity * (item.price || 0)).toFixed(3)} ر.ع
+                    </span>
+                    {canEdit && (
+                      <button
+                        onClick={() => handleRemoveItem(index)}
+                        disabled={removingIndex !== null}
+                        title="إزالة من الفاتورة"
+                        style={{
+                          padding: '6px 8px',
+                          backgroundColor: '#fee2e2',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: removingIndex !== null ? 'not-allowed' : 'pointer',
+                          color: '#dc2626',
+                          opacity: removingIndex === index ? 0.6 : 1,
+                        }}
+                      >
+                        <Trash2 style={{ width: '14px', height: '14px' }} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -298,17 +354,17 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <span style={{ fontSize: '14px', color: '#64748b' }}>المجموع الفرعي</span>
               <span style={{ fontSize: '14px', color: '#475569' }}>
-                {(order.subtotal || order.total || 0).toFixed(3)} ر.ع
+                {(displayOrder.subtotal ?? displayOrder.total ?? 0).toFixed(3)} ر.ع
               </span>
             </div>
             
-            {order.discount && order.discount.amount > 0 && (
+            {displayOrder.discount && displayOrder.discount.amount > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ fontSize: '14px', color: '#64748b' }}>
-                  الخصم ({order.discount.percent}%)
+                  الخصم ({displayOrder.discount.percent}%)
                 </span>
                 <span style={{ fontSize: '14px', color: '#dc2626' }}>
-                  -{order.discount.amount.toFixed(3)} ر.ع
+                  -{displayOrder.discount.amount.toFixed(3)} ر.ع
                 </span>
               </div>
             )}
@@ -322,7 +378,7 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
             }}>
               <span style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>الإجمالي</span>
               <span style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>
-                {(order.total || 0).toFixed(3)} ر.ع
+                {(displayOrder.total ?? 0).toFixed(3)} ر.ع
               </span>
             </div>
           </div>
@@ -335,9 +391,9 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
           backgroundColor: '#f8fafc',
         }}>
           {/* Status Update Buttons */}
-          {onUpdateStatus && order.status !== 'completed' && order.status !== 'cancelled' && (
+          {onUpdateStatus && displayOrder.status !== 'completed' && displayOrder.status !== 'cancelled' && (
             <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-              {order.status === 'pending' && (
+              {displayOrder.status === 'pending' && (
                 <button
                   onClick={() => handleStatusChange('preparing')}
                   disabled={updating}
@@ -357,7 +413,7 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
                   بدء التحضير
                 </button>
               )}
-              {(order.status === 'preparing' || order.status === 'processing') && (
+              {(displayOrder.status === 'preparing' || displayOrder.status === 'processing') && (
                 <button
                   onClick={() => handleStatusChange('ready')}
                   disabled={updating}
@@ -377,7 +433,7 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
                   جاهز للاستلام
                 </button>
               )}
-              {order.status === 'ready' && (
+              {displayOrder.status === 'ready' && (
                 <button
                   onClick={() => handleStatusChange('completed')}
                   disabled={updating}
@@ -412,7 +468,7 @@ export default function OrderDetailsDrawer({ order, isOpen = true, onClose, onUp
                   opacity: updating ? 0.7 : 1,
                 }}
               >
-                إلغاء
+                إلغاء الطلب بالكامل
               </button>
             </div>
           )}

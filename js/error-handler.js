@@ -36,7 +36,7 @@ class ErrorHandler {
         }
 
         // في الإنتاج، يمكن إرسال الخطأ إلى خدمة مراقبة (مثل Sentry)
-        if (process.env.NODE_ENV === 'production') {
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
             this.reportToMonitoring(errorInfo);
         }
 
@@ -153,7 +153,7 @@ class ErrorHandler {
         }
 
         // حفظ في localStorage للفحص لاحقاً (في وضع التطوير فقط)
-        if (process.env.NODE_ENV !== 'production') {
+        if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'production') {
             try {
                 localStorage.setItem('error_log', JSON.stringify(this.errorLog.slice(-20)));
             } catch (e) {
@@ -329,7 +329,7 @@ class ErrorHandler {
      */
     clearErrorLog() {
         this.errorLog = [];
-        if (process.env.NODE_ENV !== 'production') {
+        if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'production') {
             localStorage.removeItem('error_log');
         }
     }

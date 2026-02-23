@@ -25,29 +25,8 @@ import {
   MoreVertical,
   RefreshCw
 } from 'lucide-react';
-
-const STATUS_CONFIG = {
-  pending: { label: 'معلق', color: '#f59e0b', bg: '#fef3c7' },
-  processing: { label: 'قيد التنفيذ', color: '#3b82f6', bg: '#dbeafe' },
-  preparing: { label: 'قيد التحضير', color: '#f59e0b', bg: '#fef3c7' },
-  ready: { label: 'جاهز', color: '#06b6d4', bg: '#cffafe' },
-  paid: { label: 'مدفوع', color: '#10b981', bg: '#dcfce7' },
-  completed: { label: 'مكتمل', color: '#10b981', bg: '#dcfce7' },
-  cancelled: { label: 'ملغي', color: '#ef4444', bg: '#fee2e2' },
-};
-
-const PAYMENT_STATUS = {
-  pending: { label: 'غير مدفوع', color: '#f59e0b', bg: '#fef3c7' },
-  paid: { label: 'مدفوع', color: '#10b981', bg: '#dcfce7' },
-};
-
-const DATE_RANGE_LABELS = {
-  today: 'اليوم',
-  week: 'هذا الأسبوع',
-  month: 'هذا الشهر',
-  year: 'هذه السنة',
-  custom: 'تاريخ محدد',
-};
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { useScreenSize } from '@/lib/hooks/useScreenSize';
 
 const PAGE_SIZE = 15;
 
@@ -57,7 +36,32 @@ export default function OrdersPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  
+  const { t, language } = useTranslation();
+  const { isMobile, isTablet, isMobileOrTablet } = useScreenSize();
+
+  const STATUS_CONFIG = {
+    pending: { label: t.orderStatus.pending, color: '#f59e0b', bg: '#fef3c7' },
+    processing: { label: t.orderStatus.processing, color: '#3b82f6', bg: '#dbeafe' },
+    preparing: { label: t.orderStatus.preparing, color: '#f59e0b', bg: '#fef3c7' },
+    ready: { label: t.orderStatus.ready, color: '#06b6d4', bg: '#cffafe' },
+    paid: { label: t.orderStatus.paid, color: '#10b981', bg: '#dcfce7' },
+    completed: { label: t.orderStatus.completed, color: '#10b981', bg: '#dcfce7' },
+    cancelled: { label: t.orderStatus.cancelled, color: '#ef4444', bg: '#fee2e2' },
+  };
+
+  const PAYMENT_STATUS = {
+    pending: { label: t.payment.unpaid, color: '#f59e0b', bg: '#fef3c7' },
+    paid: { label: t.payment.paid, color: '#10b981', bg: '#dcfce7' },
+  };
+
+  const DATE_RANGE_LABELS: Record<string, string> = {
+    today: t.common.today,
+    week: t.common.thisWeek,
+    month: t.common.thisMonth,
+    year: t.common.thisYear,
+    custom: t.common.custom,
+  };
+
   const [filters, setFilters] = useState<OrderFiltersState>({
     dateRange: 'today',
     status: 'all',
@@ -65,7 +69,7 @@ export default function OrdersPage() {
     search: '',
   });
 
-  const loadOrders = async () => {
+  const loadOrders = async (): Promise<Order[]> => {
     setLoading(true);
     try {
       const dateRange = getDateRangeForFilter(
@@ -75,8 +79,10 @@ export default function OrdersPage() {
       );
       const data = await getOrdersByDateRange(dateRange);
       setOrders(data);
+      return data;
     } catch (error) {
       console.error('Error loading orders:', error);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -150,9 +156,17 @@ export default function OrdersPage() {
     }
   };
 
+  const handleOrderUpdated = async () => {
+    const data = await loadOrders();
+    if (selectedOrder) {
+      const updated = data.find(o => o.id === selectedOrder.id);
+      if (updated) setSelectedOrder(updated);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('ar-EG', {
+    return date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {
       month: 'short',
       day: 'numeric',
     });
@@ -160,7 +174,7 @@ export default function OrdersPage() {
 
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleTimeString('ar-EG', {
+    return date.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -168,29 +182,31 @@ export default function OrdersPage() {
 
   const getSourceLabel = (source?: string) => {
     switch (source) {
-      case 'staff-menu': return 'الموظفين';
-      case 'cashier': return 'الكاشير';
-      case 'mobile': return 'الجوال';
+      case 'staff-menu': return t.nav.staffMenu;
+      case 'cashier': return t.nav.cashier;
+      case 'mobile': return language === 'ar' ? 'الجوال' : 'Mobile';
       default: return source || '-';
     }
   };
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: isMobile ? '12px' : isTablet ? '16px' : '24px' }}>
       {/* Header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '24px',
+        marginBottom: isMobile ? '16px' : '24px',
+        flexWrap: 'wrap',
+        gap: '12px',
       }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            الطلبات
+          <h1 style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+            {t.orders.title}
           </h1>
-          <p style={{ fontSize: '14px', color: '#64748b', marginTop: '4px' }}>
-            إدارة ومتابعة جميع الطلبات
-          </p>
+          {!isMobile && <p style={{ fontSize: '14px', color: '#64748b', marginTop: '4px' }}>
+            {t.orders.subtitle}
+          </p>}
         </div>
         <button
           onClick={handleRefresh}
@@ -199,11 +215,11 @@ export default function OrdersPage() {
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 20px',
+            padding: isMobile ? '8px 14px' : '10px 20px',
             backgroundColor: '#f1f5f9',
             border: '1px solid #e2e8f0',
             borderRadius: '12px',
-            fontSize: '14px',
+            fontSize: isMobile ? '13px' : '14px',
             fontWeight: 600,
             color: '#475569',
             cursor: refreshing ? 'not-allowed' : 'pointer',
@@ -216,7 +232,7 @@ export default function OrdersPage() {
               animation: refreshing ? 'spin 1s linear infinite' : 'none',
             }} 
           />
-          تحديث
+          {!isMobile && t.common.refresh}
         </button>
       </div>
 
@@ -232,7 +248,7 @@ export default function OrdersPage() {
       {/* Table */}
       <div style={{
         backgroundColor: '#ffffff',
-        borderRadius: '16px',
+        borderRadius: isMobile ? '12px' : '16px',
         border: '1px solid #e2e8f0',
         overflow: 'hidden',
       }}>
@@ -259,192 +275,169 @@ export default function OrdersPage() {
             padding: '60px',
             color: '#64748b',
           }}>
-            <p style={{ fontSize: '16px', marginBottom: '8px' }}>لا توجد طلبات</p>
+            <p style={{ fontSize: '16px', marginBottom: '8px' }}>{t.orders.noOrders}</p>
             <p style={{ fontSize: '14px', color: '#94a3b8' }}>
               {filters.search || filters.status !== 'all' || filters.paymentStatus !== 'all' 
-                ? 'جرب تغيير الفلاتر' 
-                : 'لم يتم تسجيل أي طلبات في هذه الفترة'}
+                ? (language === 'ar' ? 'جرب تغيير الفلاتر' : 'Try changing filters') 
+                : t.dashboard.noOrdersToday}
             </p>
           </div>
         ) : (
           <>
-            {/* Table Header */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '100px 140px 1fr 80px 100px 100px 100px 80px 80px',
-              gap: '12px',
-              padding: '14px 20px',
-              backgroundColor: '#f8fafc',
-              borderBottom: '1px solid #e2e8f0',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#64748b',
-            }}>
-              <div>رقم الطلب</div>
-              <div>التاريخ/الوقت</div>
-              <div>العميل/الطاولة</div>
-              <div style={{ textAlign: 'center' }}>العناصر</div>
-              <div style={{ textAlign: 'center' }}>الإجمالي</div>
-              <div style={{ textAlign: 'center' }}>الدفع</div>
-              <div style={{ textAlign: 'center' }}>الحالة</div>
-              <div style={{ textAlign: 'center' }}>المصدر</div>
-              <div style={{ textAlign: 'center' }}>إجراءات</div>
-            </div>
-
-            {/* Table Body */}
-            {paginatedOrders.map((order) => {
-              const statusConfig = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
-              const isPaid = order.paymentStatus === 'paid' || order.status === 'paid';
-              const paymentConfig = isPaid ? PAYMENT_STATUS.paid : PAYMENT_STATUS.pending;
-
-              return (
-                <div
-                  key={order.id}
-                  onClick={() => setSelectedOrder(order)}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '100px 140px 1fr 80px 100px 100px 100px 80px 80px',
-                    gap: '12px',
-                    padding: '16px 20px',
-                    borderBottom: '1px solid #f1f5f9',
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.15s',
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  {/* Order ID */}
-                  <div>
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      color: '#6366f1',
-                      fontFamily: 'monospace',
-                    }}>
-                      #{order.id.slice(-6).toUpperCase()}
-                    </span>
-                  </div>
-
-                  {/* Date/Time */}
-                  <div>
-                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#0f172a', margin: 0 }}>
-                      {formatDate(order.createdAt)}
-                    </p>
-                    <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0 0' }}>
-                      {formatTime(order.createdAt)}
-                    </p>
-                  </div>
-
-                  {/* Customer/Table */}
-                  <div>
-                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#0f172a', margin: 0 }}>
-                      {order.customerName || 'عميل'}
-                    </p>
-                    {(order.tableNumber || order.roomNumber) && (
-                      <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0 0' }}>
-                        {order.tableNumber ? `🪑 طاولة ${order.tableNumber}` : `🚪 غرفة ${order.roomNumber}`}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Items Count */}
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      color: '#475569',
-                    }}>
-                      {order.itemsCount || order.items?.length || 0}
-                    </span>
-                  </div>
-
-                  {/* Total */}
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      color: '#0f172a',
-                    }}>
-                      {order.total.toFixed(3)}
-                    </span>
-                    <span style={{ fontSize: '11px', color: '#94a3b8', marginRight: '4px' }}>
-                      ر.ع
-                    </span>
-                  </div>
-
-                  {/* Payment Status */}
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{
-                      display: 'inline-flex',
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      backgroundColor: paymentConfig.bg,
-                      color: paymentConfig.color,
-                    }}>
-                      {paymentConfig.label}
-                    </span>
-                  </div>
-
-                  {/* Order Status */}
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{
-                      display: 'inline-flex',
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      backgroundColor: statusConfig.bg,
-                      color: statusConfig.color,
-                    }}>
-                      {statusConfig.label}
-                    </span>
-                  </div>
-
-                  {/* Source */}
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>
-                      {getSourceLabel(order.source)}
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div 
-                    style={{ textAlign: 'center' }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
+            {/* Mobile: Card Layout / Desktop: Table */}
+            {isMobile ? (
+              /* Mobile Card Layout */
+              <div style={{ padding: '8px' }}>
+                {paginatedOrders.map((order) => {
+                  const statusConfig = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
+                  const isPaid = order.paymentStatus === 'paid' || order.status === 'paid';
+                  const paymentConfig = isPaid ? PAYMENT_STATUS.paid : PAYMENT_STATUS.pending;
+                  return (
+                    <div
+                      key={order.id}
                       onClick={() => setSelectedOrder(order)}
                       style={{
-                        padding: '8px',
-                        backgroundColor: '#f1f5f9',
-                        border: 'none',
-                        borderRadius: '8px',
+                        padding: '14px',
+                        borderBottom: '1px solid #f1f5f9',
                         cursor: 'pointer',
-                        color: '#475569',
                       }}
                     >
-                      <Eye style={{ width: '16px', height: '16px' }} />
-                    </button>
-                  </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#6366f1', fontFamily: 'monospace' }}>
+                          #{order.id.slice(-6).toUpperCase()}
+                        </span>
+                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>{formatTime(order.createdAt)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: 500 }}>
+                          {order.customerName || (order.tableNumber ? `${t.cashier.table} ${order.tableNumber}` : '-')}
+                        </span>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                          {order.total.toFixed(3)} {t.common.currency}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, backgroundColor: statusConfig.bg, color: statusConfig.color }}>
+                          {statusConfig.label}
+                        </span>
+                        <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, backgroundColor: paymentConfig.bg, color: paymentConfig.color }}>
+                          {paymentConfig.label}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8', alignSelf: 'center' }}>
+                          {(order.itemsCount || order.items?.length || 0)} {t.dashboard.product}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Desktop/Tablet: Scrollable Table */
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                {/* Table Header */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: isTablet
+                    ? '80px 110px 1fr 60px 90px 90px 90px 60px'
+                    : '100px 140px 1fr 80px 100px 100px 100px 80px 80px',
+                  gap: '12px',
+                  padding: '14px 20px',
+                  backgroundColor: '#f8fafc',
+                  borderBottom: '1px solid #e2e8f0',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#64748b',
+                  minWidth: isTablet ? '700px' : 'auto',
+                }}>
+                  <div>{t.cashier.orderNumber}</div>
+                  <div>{`${t.common.date}/${t.common.time}`}</div>
+                  <div>{`${t.common.name}/${t.cashier.table}`}</div>
+                  <div style={{ textAlign: 'center' }}>{t.orders.orderItems}</div>
+                  <div style={{ textAlign: 'center' }}>{t.common.total}</div>
+                  <div style={{ textAlign: 'center' }}>{t.payment.paymentMethod}</div>
+                  <div style={{ textAlign: 'center' }}>{t.common.status}</div>
+                  {!isTablet && <div style={{ textAlign: 'center' }}>{language === 'ar' ? 'المصدر' : 'Source'}</div>}
+                  <div style={{ textAlign: 'center' }}>{t.common.actions}</div>
                 </div>
-              );
-            })}
+
+                {/* Table Body */}
+                {paginatedOrders.map((order) => {
+                  const statusConfig = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
+                  const isPaid = order.paymentStatus === 'paid' || order.status === 'paid';
+                  const paymentConfig = isPaid ? PAYMENT_STATUS.paid : PAYMENT_STATUS.pending;
+
+                  return (
+                    <div
+                      key={order.id}
+                      onClick={() => setSelectedOrder(order)}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: isTablet
+                          ? '80px 110px 1fr 60px 90px 90px 90px 60px'
+                          : '100px 140px 1fr 80px 100px 100px 100px 80px 80px',
+                        gap: '12px',
+                        padding: '16px 20px',
+                        borderBottom: '1px solid #f1f5f9',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s',
+                        minWidth: isTablet ? '700px' : 'auto',
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <div><span style={{ fontSize: '13px', fontWeight: 700, color: '#6366f1', fontFamily: 'monospace' }}>#{order.id.slice(-6).toUpperCase()}</span></div>
+                      <div>
+                        <p style={{ fontSize: '13px', fontWeight: 500, color: '#0f172a', margin: 0 }}>{formatDate(order.createdAt)}</p>
+                        <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0 0' }}>{formatTime(order.createdAt)}</p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '13px', fontWeight: 500, color: '#0f172a', margin: 0 }}>{order.customerName || t.common.name}</p>
+                        {(order.tableNumber || order.roomNumber) && (
+                          <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0 0' }}>
+                            {order.tableNumber ? `🪑 ${t.cashier.table} ${order.tableNumber}` : `🚪 ${t.cashier.room} ${order.roomNumber}`}
+                          </p>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'center' }}><span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>{order.itemsCount || order.items?.length || 0}</span></div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{order.total.toFixed(3)}</span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8', marginRight: '4px' }}>{t.common.currency}</span>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, backgroundColor: paymentConfig.bg, color: paymentConfig.color }}>{paymentConfig.label}</span>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, backgroundColor: statusConfig.bg, color: statusConfig.color }}>{statusConfig.label}</span>
+                      </div>
+                      {!isTablet && <div style={{ textAlign: 'center' }}><span style={{ fontSize: '12px', color: '#64748b' }}>{getSourceLabel(order.source)}</span></div>}
+                      <div style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => setSelectedOrder(order)} style={{ padding: '8px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', color: '#475569' }}>
+                          <Eye style={{ width: '16px', height: '16px' }} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Pagination */}
             {totalPages > 1 && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px 20px',
+                justifyContent: isMobile ? 'center' : 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                padding: isMobile ? '12px' : '16px 20px',
                 borderTop: '1px solid #e2e8f0',
                 backgroundColor: '#f8fafc',
               }}>
                 <span style={{ fontSize: '13px', color: '#64748b' }}>
-                  عرض {((currentPage - 1) * PAGE_SIZE) + 1} - {Math.min(currentPage * PAGE_SIZE, filteredOrders.length)} من {filteredOrders.length}
+                  {language === 'ar'
+                    ? `عرض ${((currentPage - 1) * PAGE_SIZE) + 1} - ${Math.min(currentPage * PAGE_SIZE, filteredOrders.length)} من ${filteredOrders.length}`
+                    : `Showing ${((currentPage - 1) * PAGE_SIZE) + 1} - ${Math.min(currentPage * PAGE_SIZE, filteredOrders.length)} of ${filteredOrders.length}`}
                 </span>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
@@ -530,6 +523,7 @@ export default function OrdersPage() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onUpdateStatus={handleStatusUpdate}
+          onOrderUpdated={handleOrderUpdated}
         />
       )}
 

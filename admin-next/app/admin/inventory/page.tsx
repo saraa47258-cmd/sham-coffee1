@@ -24,10 +24,12 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
 
 type ModalType = 'add' | 'remove' | 'adjust' | 'history' | null;
 
 export default function InventoryPage() {
+  const { t, language } = useTranslation();
   const { user } = useAuth();
   
   // Data
@@ -74,7 +76,7 @@ export default function InventoryPage() {
       setStats(statsData);
     } catch (error) {
       console.error('Error loading inventory:', error);
-      showToast('خطأ في تحميل البيانات', 'error');
+      showToast(language === 'ar' ? 'خطأ في تحميل البيانات' : 'Error loading data', 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -138,7 +140,7 @@ export default function InventoryPage() {
             data.note,
             data.supplier
           );
-          showToast(`تم إضافة ${data.quantity} وحدة بنجاح`, 'success');
+          showToast(language === 'ar' ? `تم إضافة ${data.quantity} وحدة بنجاح` : `${data.quantity} units added successfully`, 'success');
           break;
         case 'remove':
           await removeStock(
@@ -149,7 +151,7 @@ export default function InventoryPage() {
             user.name,
             data.note
           );
-          showToast(`تم سحب ${data.quantity} وحدة بنجاح`, 'success');
+          showToast(language === 'ar' ? `تم سحب ${data.quantity} وحدة بنجاح` : `${data.quantity} units removed successfully`, 'success');
           break;
         case 'adjust':
           await adjustStock(
@@ -160,7 +162,7 @@ export default function InventoryPage() {
             user.name,
             data.note
           );
-          showToast('تم تعديل الكمية بنجاح', 'success');
+          showToast(language === 'ar' ? 'تم تعديل الكمية بنجاح' : 'Quantity adjusted successfully', 'success');
           break;
       }
 
@@ -168,7 +170,7 @@ export default function InventoryPage() {
       await loadData(true);
     } catch (error: any) {
       console.error('Stock operation error:', error);
-      showToast(error.message || 'حدث خطأ', 'error');
+      showToast(error.message || t.common.error, 'error');
     } finally {
       setProcessing(false);
     }
@@ -179,7 +181,7 @@ export default function InventoryPage() {
     const csvContent = exportInventoryToCSV(products);
     const filename = `inventory_${new Date().toISOString().split('T')[0]}.csv`;
     downloadCSV(csvContent, filename);
-    showToast('تم تصدير البيانات بنجاح', 'success');
+    showToast(language === 'ar' ? 'تم تصدير البيانات بنجاح' : 'Data exported successfully', 'success');
   };
 
   return (
@@ -193,6 +195,8 @@ export default function InventoryPage() {
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: '24px',
+        flexWrap: 'wrap',
+        gap: '12px',
       }}>
         <div>
           <h1 style={{
@@ -205,10 +209,10 @@ export default function InventoryPage() {
             gap: '12px',
           }}>
             <Package style={{ width: '28px', height: '28px', color: '#6366f1' }} />
-            إدارة المخزون
+            {t.inventory.title}
           </h1>
           <p style={{ fontSize: '14px', color: '#64748b', marginTop: '4px' }}>
-            تتبع وإدارة مخزون المنتجات
+            {t.inventory.subtitle}
           </p>
         </div>
         <button
@@ -235,7 +239,7 @@ export default function InventoryPage() {
               animation: refreshing ? 'spin 1s linear infinite' : 'none',
             }} 
           />
-          تحديث
+          {t.common.refresh}
         </button>
       </div>
 

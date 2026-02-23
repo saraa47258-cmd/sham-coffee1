@@ -3,20 +3,28 @@ import { getDatabase, Database } from 'firebase/database';
 import { getAuth, Auth } from 'firebase/auth';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
-// قراءة الإعدادات من متغيرات البيئة
+// قراءة الإعدادات من متغيرات البيئة (مطلوبة — لا توجد قيم افتراضية)
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyBD3RarLj_696emYW84zZ1tliP_Th1z6mM",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "sham-coffee.firebaseapp.com",
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://sham-coffee-default-rtdb.firebaseio.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sham-coffee",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "sham-coffee.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "483086837036",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:483086837036:web:2a6bf9084050ef399ef889"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || '',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
 };
 
-// التحقق من وجود الإعدادات المطلوبة
-if (!firebaseConfig.apiKey || !firebaseConfig.databaseURL) {
-  console.warn('⚠️ Firebase configuration is incomplete. Please check your environment variables.');
+// التحقق من وجود الإعدادات المطلوبة — تحذير فقط أثناء البناء الثابت
+const requiredKeys = ['apiKey', 'databaseURL', 'projectId'] as const;
+if (typeof window !== 'undefined') {
+  for (const key of requiredKeys) {
+    if (!firebaseConfig[key]) {
+      throw new Error(
+        `⚠️ Firebase: متغير البيئة NEXT_PUBLIC_FIREBASE_${key.replace(/([A-Z])/g, '_$1').toUpperCase()} مطلوب. ` +
+        'أنشئ ملف .env.local من .env.example وأضف القيم.'
+      );
+    }
+  }
 }
 
 // Initialize Firebase

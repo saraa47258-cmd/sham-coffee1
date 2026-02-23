@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backup": "node scripts/backup-firebase.js",
+    "restore": "node scripts/restore-firebase.js",
+    "migrate": "node scripts/migrate-data.js",
+    "docker:build": "docker build -t sham-coffee-admin .",
+    "docker:run": "docker run -p 3000:3000 sham-coffee-admin"
   },
   "dependencies": {
     "firebase": "^12.8.0",

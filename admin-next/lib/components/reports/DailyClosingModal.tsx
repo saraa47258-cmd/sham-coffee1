@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { DailyClosing, createDailyClosing, isDayClosed } from '@/lib/reports';
+import { DailyClosing, createDailyClosing, isDayClosed, getTodaySalesForClosing } from '@/lib/reports';
+import { useTranslation } from '@/lib/context/LanguageContext';
 import { 
   X, 
   Calendar, 
@@ -14,8 +15,10 @@ import {
   Banknote,
   CreditCard,
   ShoppingBag,
-  TrendingUp
+  TrendingUp,
+  RefreshCw
 } from 'lucide-react';
+import * as PC from '@/lib/utils/precision';
 
 interface DailyClosingModalProps {
   onClose: () => void;
@@ -30,6 +33,7 @@ export default function DailyClosingModal({
   userId,
   userName,
 }: DailyClosingModalProps) {
+  const { t, language } = useTranslation();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [openingCash, setOpeningCash] = useState('0');
   const [cashSales, setCashSales] = useState('0');
@@ -42,33 +46,68 @@ export default function DailyClosingModal({
   const [error, setError] = useState('');
   const [alreadyClosed, setAlreadyClosed] = useState(false);
   const [checkingClosed, setCheckingClosed] = useState(true);
+  const [loadingData, setLoadingData] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Check if day is already closed
+  // Check if day is already closed and load sales data
   useEffect(() => {
-    checkIfClosed();
+    checkIfClosedAndLoadData();
   }, [date]);
 
-  const checkIfClosed = async () => {
+  const checkIfClosedAndLoadData = async () => {
     setCheckingClosed(true);
+    setLoadingData(true);
+    setDataLoaded(false);
     try {
       const closed = await isDayClosed(date);
       setAlreadyClosed(closed);
+      
+      if (!closed) {
+        // جلب بيانات المبيعات المحسوبة تلقائياً
+        const salesData = await getTodaySalesForClosing(date);
+        
+        // تعبئة الحقول بالقيم المحسوبة (يمكن تعديلها)
+        setCashSales(PC.format(salesData.cashSales));
+        setCardSales(PC.format(salesData.cardSales));
+        setOrdersCount(salesData.ordersCount.toString());
+        setDataLoaded(true);
+      }
     } catch (error) {
-      console.error('Error checking if day is closed:', error);
+      console.error('Error loading closing data:', error);
     } finally {
       setCheckingClosed(false);
+      setLoadingData(false);
     }
   };
 
-  const totalSales = parseFloat(cashSales || '0') + parseFloat(cardSales || '0');
-  const expectedCash = parseFloat(openingCash || '0') + parseFloat(cashSales || '0') - parseFloat(expenses || '0');
-  const difference = parseFloat(actualCash || '0') - expectedCash;
+  const reloadData = async () => {
+    if (loadingData) return;
+    setLoadingData(true);
+    try {
+      const salesData = await getTodaySalesForClosing(date);
+      setCashSales(PC.format(salesData.cashSales));
+      setCardSales(PC.format(salesData.cardSales));
+      setOrdersCount(salesData.ordersCount.toString());
+      setDataLoaded(true);
+    } catch (error) {
+      console.error('Error reloading data:', error);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const totalSales = PC.add(parseFloat(cashSales || '0'), parseFloat(cardSales || '0'));
+  const expectedCash = PC.subtract(
+    PC.add(parseFloat(openingCash || '0'), parseFloat(cashSales || '0')),
+    parseFloat(expenses || '0')
+  );
+  const difference = PC.subtract(parseFloat(actualCash || '0'), expectedCash);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (alreadyClosed) {
-      setError('هذا اليوم مغلق بالفعل');
+      setError(t.reports.alreadyClosed);
       return;
     }
 
@@ -95,7 +134,7 @@ export default function DailyClosingModal({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'حدث خطأ أثناء الإغلاق');
+      setError(err.message || (language === 'ar' ? 'حدث خطأ أثناء الإغلاق' : 'Error during closing'));
     } finally {
       setLoading(false);
     }
@@ -155,10 +194,10 @@ export default function DailyClosingModal({
             </div>
             <div>
               <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
-                إغلاق يومي يدوي
+                {t.reports.dailyClosing}
               </h2>
               <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
-                إدخال بيانات الإغلاق يدوياً
+                {language === 'ar' ? 'القيم من النظام - يمكنك تعديلها' : 'Values from system - you can edit them'}
               </p>
             </div>
           </div>
@@ -185,7 +224,20 @@ export default function DailyClosingModal({
         {/* Content */}
         {checkingClosed ? (
           <div style={{ padding: '48px', textAlign: 'center' }}>
-            <p style={{ color: '#64748b' }}>جاري التحقق...</p>
+            <RefreshCw style={{ 
+              width: '32px', 
+              height: '32px', 
+              color: '#f59e0b',
+              animation: 'spin 1s linear infinite',
+              marginBottom: '16px',
+            }} />
+            <p style={{ color: '#64748b' }}>{t.common.loading}</p>
+            <style>{`
+              @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
           </div>
         ) : alreadyClosed ? (
           <div style={{
@@ -205,10 +257,10 @@ export default function DailyClosingModal({
               <CheckCircle style={{ width: '40px', height: '40px', color: '#ffffff' }} />
             </div>
             <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-              تم إغلاق هذا اليوم
+              {t.reports.alreadyClosed}
             </h3>
             <p style={{ fontSize: '14px', color: '#64748b' }}>
-              لا يمكن إجراء إغلاق آخر لنفس اليوم
+              {language === 'ar' ? 'لا يمكن إجراء إغلاق آخر لنفس اليوم' : 'Cannot perform another closing for the same day'}
             </p>
             <button
               onClick={onClose}
@@ -224,7 +276,7 @@ export default function DailyClosingModal({
                 cursor: 'pointer',
               }}
             >
-              إغلاق
+              {t.common.close}
             </button>
           </div>
         ) : (
@@ -258,7 +310,7 @@ export default function DailyClosingModal({
                   marginBottom: '10px',
                 }}>
                   <Calendar style={{ width: '16px', height: '16px' }} />
-                  تاريخ الإغلاق
+                  {t.reports.closingDate}
                 </label>
                 <input
                   type="date"
@@ -278,7 +330,7 @@ export default function DailyClosingModal({
                 />
               </div>
 
-              {/* Sales Input (Manual) */}
+              {/* Sales Input (Editable with auto-loaded data) */}
               <div style={{
                 padding: '20px',
                 backgroundColor: '#f0fdf4',
@@ -289,13 +341,40 @@ export default function DailyClosingModal({
                 <div style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '8px', 
+                  justifyContent: 'space-between',
                   marginBottom: '16px',
                 }}>
-                  <TrendingUp style={{ width: '20px', height: '20px', color: '#16a34a' }} />
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>
-                    بيانات المبيعات (إدخال يدوي)
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <TrendingUp style={{ width: '20px', height: '20px', color: '#16a34a' }} />
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>
+                      {t.reports.salesData} {dataLoaded ? (language === 'ar' ? '(من النظام - قابلة للتعديل)' : '(from system - editable)') : (language === 'ar' ? '(إدخال يدوي)' : '(manual entry)')}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={reloadData}
+                    disabled={loadingData}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      backgroundColor: loadingData ? '#e2e8f0' : '#dcfce7',
+                      border: '1px solid #86efac',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#16a34a',
+                      cursor: loadingData ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <RefreshCw style={{ 
+                      width: '14px', 
+                      height: '14px',
+                      animation: loadingData ? 'spin 1s linear infinite' : 'none',
+                    }} />
+                    {loadingData ? t.common.loading : t.common.refresh}
+                  </button>
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -310,7 +389,7 @@ export default function DailyClosingModal({
                       marginBottom: '8px',
                     }}>
                       <Banknote style={{ width: '14px', height: '14px', color: '#3b82f6' }} />
-                      المبيعات النقدية
+                      {t.reports.cashSales}
                     </label>
                     <input
                       type="number"
@@ -342,7 +421,7 @@ export default function DailyClosingModal({
                       marginBottom: '8px',
                     }}>
                       <CreditCard style={{ width: '14px', height: '14px', color: '#8b5cf6' }} />
-                      مبيعات البطاقة
+                      {t.reports.cardSales}
                     </label>
                     <input
                       type="number"
@@ -376,7 +455,7 @@ export default function DailyClosingModal({
                     marginBottom: '8px',
                   }}>
                     <ShoppingBag style={{ width: '14px', height: '14px', color: '#6366f1' }} />
-                    عدد الطلبات
+                    {t.reports.ordersCount}
                   </label>
                   <input
                     type="number"
@@ -405,10 +484,10 @@ export default function DailyClosingModal({
                   border: '2px solid #22c55e',
                 }}>
                   <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
-                    إجمالي المبيعات
+                    {t.reports.totalSales}
                   </p>
                   <p style={{ fontSize: '28px', fontWeight: 700, color: '#22c55e', margin: 0 }}>
-                    {totalSales.toFixed(3)} ر.ع
+                    {PC.format(totalSales)} {t.common.currency}
                   </p>
                 </div>
               </div>
@@ -423,7 +502,7 @@ export default function DailyClosingModal({
                     color: '#374151',
                     marginBottom: '10px',
                   }}>
-                    رصيد الافتتاح
+                    {t.reports.openingCash}
                   </label>
                   <input
                     type="number"
@@ -450,7 +529,7 @@ export default function DailyClosingModal({
                     color: '#374151',
                     marginBottom: '10px',
                   }}>
-                    المصروفات
+                    {t.reports.expenses}
                   </label>
                   <input
                     type="number"
@@ -483,7 +562,7 @@ export default function DailyClosingModal({
                   marginBottom: '10px',
                 }}>
                   <DollarSign style={{ width: '16px', height: '16px' }} />
-                  النقد الفعلي في الصندوق
+                  {t.reports.actualCash}
                 </label>
                 <input
                   type="number"
@@ -508,23 +587,23 @@ export default function DailyClosingModal({
               {/* Difference */}
               <div style={{
                 padding: '16px',
-                backgroundColor: difference === 0 ? 'rgba(34, 197, 94, 0.1)' :
+                backgroundColor: PC.equals(difference, 0) ? 'rgba(34, 197, 94, 0.1)' :
                               difference > 0 ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                 borderRadius: '12px',
                 marginBottom: '20px',
                 textAlign: 'center',
               }}>
                 <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
-                  الفرق (الفعلي - المتوقع: {expectedCash.toFixed(3)})
+                  {t.reports.difference} ({language === 'ar' ? 'الفعلي' : 'Actual'} - {t.reports.expectedCash}: {PC.format(expectedCash)})
                 </p>
                 <p style={{
                   fontSize: '28px',
                   fontWeight: 700,
-                  color: difference === 0 ? '#22c55e' :
+                  color: PC.equals(difference, 0) ? '#22c55e' :
                          difference > 0 ? '#3b82f6' : '#ef4444',
                   margin: 0,
                 }}>
-                  {difference > 0 ? '+' : ''}{difference.toFixed(3)} ر.ع
+                  {difference > 0 ? '+' : ''}{PC.format(difference)} {t.common.currency}
                 </p>
               </div>
 
@@ -540,12 +619,12 @@ export default function DailyClosingModal({
                   marginBottom: '10px',
                 }}>
                   <FileText style={{ width: '16px', height: '16px' }} />
-                  ملاحظات (اختياري)
+                  {t.common.notes} ({t.common.optional})
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="أي ملاحظات إضافية عن إغلاق اليوم..."
+                  placeholder={language === 'ar' ? 'أي ملاحظات إضافية عن إغلاق اليوم...' : 'Any additional notes about closing...'}
                   rows={3}
                   style={{
                     width: '100%',
@@ -584,7 +663,7 @@ export default function DailyClosingModal({
                   cursor: 'pointer',
                 }}
               >
-                إلغاء
+                {t.common.cancel}
               </button>
               <button
                 type="submit"
@@ -606,11 +685,11 @@ export default function DailyClosingModal({
                 }}
               >
                 {loading ? (
-                  'جاري الحفظ...'
+                  language === 'ar' ? 'جاري الحفظ...' : 'Saving...'
                 ) : (
                   <>
                     <Lock style={{ width: '18px', height: '18px' }} />
-                    تأكيد وإغلاق اليوم
+                    {t.reports.confirmAndClose}
                   </>
                 )}
               </button>

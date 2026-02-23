@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   getWorkers,
   updateWorkerPermissions,
@@ -9,36 +10,40 @@ import {
   getDefaultWorkerPermissions,
   getFullPermissions,
 } from '@/lib/firebase/database';
-import Sidebar from '@/lib/components/Sidebar';
-import Topbar from '@/lib/components/Topbar';
-import { Shield, Users, Check, X, Save, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { useScreenSize } from '@/lib/hooks/useScreenSize';
+import { Shield, Users, Check, X, Save, RefreshCw, Eye, EyeOff, ChevronLeft } from 'lucide-react';
 
-// Module and action labels in Arabic
+// Module and action labels
 const moduleLabels: Record<keyof WorkerPermissions['modules'], string> = {
-  staffMenu: 'قائمة الموظفين',
-  orders: 'الطلبات',
-  tables: 'الطاولات',
-  rooms: 'الغرف',
-  cashier: 'الكاشير',
-  inventory: 'المخزون',
-  reports: 'التقارير',
-  products: 'المنتجات',
+  staffMenu: 'staffMenu',
+  orders: 'orders',
+  tables: 'tables',
+  rooms: 'rooms',
+  cashier: 'cashier',
+  inventory: 'inventory',
+  reports: 'reports',
+  products: 'products',
 };
 
 const actionLabels: Record<keyof WorkerPermissions['actions'], string> = {
-  createOrder: 'إنشاء طلب',
-  editOrder: 'تعديل طلب',
-  cancelOrder: 'إلغاء طلب',
-  processPayment: 'معالجة الدفع',
-  applyDiscount: 'تطبيق خصم',
-  viewFinancials: 'عرض البيانات المالية',
-  manageProducts: 'إدارة المنتجات',
-  manageTables: 'إدارة الطاولات',
-  manageRooms: 'إدارة الغرف',
-  dailyClosing: 'إغلاق يومي',
+  createOrder: 'createOrder',
+  editOrder: 'editOrder',
+  cancelOrder: 'cancelOrder',
+  processPayment: 'processPayment',
+  applyDiscount: 'applyDiscount',
+  viewFinancials: 'viewFinancials',
+  manageProducts: 'manageProducts',
+  manageTables: 'manageTables',
+  manageRooms: 'manageRooms',
+  dailyClosing: 'dailyClosingAction',
 };
 
 export default function PermissionsPage() {
+  const router = useRouter();
+  const { t, language } = useTranslation();
+  const { isMobile, isTablet, isMobileOrTablet } = useScreenSize();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
@@ -48,12 +53,19 @@ export default function PermissionsPage() {
 
   // Helper to get worker display name
   const getWorkerName = (worker: Worker): string => {
-    return worker.fullName || worker.name || worker.username || 'موظف';
+    return worker.fullName || worker.name || worker.username || t.permissionsPage.worker;
   };
 
+  // Check if user is admin
   useEffect(() => {
+    const user = getCurrentUser();
+    if (!user || !isAdmin()) {
+      // Redirect to dashboard if not admin
+      router.push('/admin');
+      return;
+    }
     loadWorkers();
-  }, []);
+  }, [router]);
 
   const loadWorkers = async () => {
     try {
@@ -141,25 +153,62 @@ export default function PermissionsPage() {
       setSelectedWorker(prev => prev ? { ...prev, detailedPermissions: permissions } : null);
     } catch (error) {
       console.error('Error saving permissions:', error);
-      alert('حدث خطأ في حفظ الصلاحيات');
+      alert(t.permissionsPage.errorSaving);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f1f5f9' }}>
-      <Sidebar />
-      
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Topbar title="إدارة الصلاحيات" />
-        
-        <main style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', height: '100%' }}>
+    <div style={{ padding: isMobile ? '0' : '0' }}>
+      {/* Page Title */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: isMobile ? '16px' : '24px',
+      }}>
+        <Shield style={{ width: isMobile ? '20px' : '24px', height: isMobile ? '20px' : '24px', color: '#6366f1' }} />
+        <h1 style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+          {t.permissionsPage.title}
+        </h1>
+      </div>
+
+      {/* Mobile: show back button when a worker is selected */}
+      {isMobile && selectedWorker && (
+        <button
+          onClick={() => setSelectedWorker(null)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 14px',
+            marginBottom: '12px',
+            backgroundColor: '#f1f5f9',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            fontSize: '13px',
+            fontWeight: 600,
+            color: '#475569',
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronLeft style={{ width: '16px', height: '16px' }} />
+          {language === 'ar' ? 'العودة للقائمة' : 'Back to list'}
+        </button>
+      )}
+
+      <div style={{ 
+        display: isMobile ? 'flex' : 'grid', 
+        flexDirection: 'column',
+        gridTemplateColumns: isMobile ? '1fr' : isTablet ? '260px 1fr' : '320px 1fr', 
+        gap: isMobile ? '16px' : '24px',
+      }}>
             {/* Workers List */}
+            {(!isMobile || !selectedWorker) && (
             <div style={{
               backgroundColor: '#ffffff',
-              borderRadius: '16px',
+              borderRadius: isMobile ? '12px' : '16px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
               overflow: 'hidden',
             }}>
@@ -183,7 +232,7 @@ export default function PermissionsPage() {
                     <Users style={{ width: '20px', height: '20px', color: '#fff' }} />
                   </div>
                   <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                    الموظفون
+                    {t.permissionsPage.workers}
                   </h2>
                 </div>
                 <button
@@ -200,14 +249,14 @@ export default function PermissionsPage() {
                 </button>
               </div>
               
-              <div style={{ padding: '12px', maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+              <div style={{ padding: '12px', maxHeight: isMobile ? 'none' : 'calc(100vh - 280px)', overflowY: 'auto' }}>
                 {loading ? (
                   <div style={{ textAlign: 'center', padding: '40px' }}>
-                    <p style={{ color: '#64748b' }}>جاري التحميل...</p>
+                    <p style={{ color: '#64748b' }}>{t.common.loading}</p>
                   </div>
                 ) : workers.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '40px' }}>
-                    <p style={{ color: '#64748b' }}>لا يوجد موظفون</p>
+                    <p style={{ color: '#64748b' }}>{t.workers.noWorkers}</p>
                   </div>
                 ) : (
                   workers.map(worker => (
@@ -271,11 +320,13 @@ export default function PermissionsPage() {
                 )}
               </div>
             </div>
+            )}
 
             {/* Permissions Panel */}
+            {(!isMobile || selectedWorker) && (
             <div style={{
               backgroundColor: '#ffffff',
-              borderRadius: '16px',
+              borderRadius: isMobile ? '12px' : '16px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
               overflow: 'hidden',
             }}>
@@ -290,7 +341,7 @@ export default function PermissionsPage() {
                   <div style={{ textAlign: 'center' }}>
                     <Shield style={{ width: '64px', height: '64px', color: '#cbd5e1', margin: '0 auto 16px' }} />
                     <p style={{ fontSize: '16px', color: '#64748b' }}>
-                      اختر موظفاً لتعديل صلاحياته
+                      {t.permissionsPage.selectWorker}
                     </p>
                   </div>
                 </div>
@@ -298,16 +349,18 @@ export default function PermissionsPage() {
                 <>
                   {/* Header */}
                   <div style={{
-                    padding: '20px 24px',
+                    padding: isMobile ? '14px' : '20px 24px',
                     borderBottom: '1px solid #e2e8f0',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{
-                        width: '48px',
-                        height: '48px',
+                        width: isMobile ? '40px' : '48px',
+                        height: isMobile ? '40px' : '48px',
                         borderRadius: '12px',
                         background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
                         display: 'flex',
@@ -320,12 +373,12 @@ export default function PermissionsPage() {
                         {getWorkerName(selectedWorker).charAt(0)}
                       </div>
                       <div>
-                        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                          صلاحيات {getWorkerName(selectedWorker)}
+                        <h2 style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                          {t.permissionsPage.permissionsOf} {getWorkerName(selectedWorker)}
                         </h2>
-                        <p style={{ fontSize: '14px', color: '#64748b', margin: '2px 0 0 0' }}>
+                        {!isMobile && <p style={{ fontSize: '14px', color: '#64748b', margin: '2px 0 0 0' }}>
                           {selectedWorker.position} • @{selectedWorker.username}
-                        </p>
+                        </p>}
                       </div>
                     </div>
                     
@@ -336,7 +389,7 @@ export default function PermissionsPage() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        padding: '10px 20px',
+                        padding: isMobile ? '8px 14px' : '10px 20px',
                         borderRadius: '10px',
                         border: 'none',
                         background: saved 
@@ -352,24 +405,24 @@ export default function PermissionsPage() {
                       {saving ? (
                         <>
                           <RefreshCw style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
-                          جاري الحفظ...
+                          {t.common.saving}
                         </>
                       ) : saved ? (
                         <>
                           <Check style={{ width: '16px', height: '16px' }} />
-                          تم الحفظ
+                          {t.common.saved}
                         </>
                       ) : (
                         <>
                           <Save style={{ width: '16px', height: '16px' }} />
-                          حفظ الصلاحيات
+                          {t.permissionsPage.savePermissions}
                         </>
                       )}
                     </button>
                   </div>
 
                   {/* Permissions Content */}
-                  <div style={{ padding: '24px', maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
+                  <div style={{ padding: isMobile ? '14px' : '24px', maxHeight: isMobile ? 'none' : 'calc(100vh - 320px)', overflowY: 'auto' }}>
                     {/* Modules Section */}
                     <div style={{ marginBottom: '32px' }}>
                       <div style={{
@@ -379,7 +432,7 @@ export default function PermissionsPage() {
                         marginBottom: '16px',
                       }}>
                         <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                          🗂️ الوصول للأقسام
+                          🗂️ {t.permissionsPage.modulesAccess}
                         </h3>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button
@@ -395,7 +448,7 @@ export default function PermissionsPage() {
                               cursor: 'pointer',
                             }}
                           >
-                            تفعيل الكل
+                            {t.permissionsPage.enableAll}
                           </button>
                           <button
                             onClick={() => setAllModules(false)}
@@ -410,7 +463,7 @@ export default function PermissionsPage() {
                               cursor: 'pointer',
                             }}
                           >
-                            تعطيل الكل
+                            {t.permissionsPage.disableAll}
                           </button>
                         </div>
                       </div>
@@ -445,7 +498,7 @@ export default function PermissionsPage() {
                               fontWeight: 600,
                               color: permissions.modules[module] ? '#166534' : '#475569',
                             }}>
-                              {moduleLabels[module]}
+                              {(t.nav as any)[moduleLabels[module]] || moduleLabels[module]}
                             </span>
                             <div style={{
                               width: '24px',
@@ -476,7 +529,7 @@ export default function PermissionsPage() {
                         marginBottom: '16px',
                       }}>
                         <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                          ⚡ الإجراءات المسموحة
+                          ⚡ {t.permissionsPage.allowedActions}
                         </h3>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button
@@ -492,7 +545,7 @@ export default function PermissionsPage() {
                               cursor: 'pointer',
                             }}
                           >
-                            تفعيل الكل
+                            {t.permissionsPage.enableAll}
                           </button>
                           <button
                             onClick={() => setAllActions(false)}
@@ -507,7 +560,7 @@ export default function PermissionsPage() {
                               cursor: 'pointer',
                             }}
                           >
-                            تعطيل الكل
+                            {t.permissionsPage.disableAll}
                           </button>
                         </div>
                       </div>
@@ -550,7 +603,7 @@ export default function PermissionsPage() {
                                   ? <Eye style={{ width: '14px', height: '14px' }} />
                                   : <EyeOff style={{ width: '14px', height: '14px' }} />
                               )}
-                              {actionLabels[action]}
+                              {(t.permissionsPage as any)[actionLabels[action]] || actionLabels[action]}
                             </span>
                             <div style={{
                               width: '24px',
@@ -576,21 +629,21 @@ export default function PermissionsPage() {
                     {!permissions.actions.viewFinancials && (
                       <div style={{
                         marginTop: '24px',
-                        padding: '16px',
+                        padding: isMobile ? '12px' : '16px',
                         borderRadius: '12px',
                         backgroundColor: '#fef3c7',
                         border: '1px solid #fbbf24',
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: isMobile ? 'flex-start' : 'center',
                         gap: '12px',
                       }}>
                         <EyeOff style={{ width: '20px', height: '20px', color: '#d97706' }} />
                         <div>
                           <p style={{ fontSize: '14px', fontWeight: 600, color: '#92400e', margin: 0 }}>
-                            البيانات المالية مخفية
+                            {t.permissionsPage.financialDataHidden}
                           </p>
                           <p style={{ fontSize: '13px', color: '#a16207', margin: '4px 0 0 0' }}>
-                            لن يتمكن هذا الموظف من رؤية الأسعار والإجماليات والتقارير المالية
+                            {t.permissionsPage.financialDataWarning}
                           </p>
                         </div>
                       </div>
@@ -599,9 +652,8 @@ export default function PermissionsPage() {
                 </>
               )}
             </div>
+            )}
           </div>
-        </main>
-      </div>
     </div>
   );
 }

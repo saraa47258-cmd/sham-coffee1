@@ -2,6 +2,8 @@
 
 import { Product, ProductVariation } from '@/lib/firebase/database';
 import { X, Minus, Plus, Trash2, ShoppingCart, Send, Layers } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { getLocalizedName } from '@/lib/utils/localized';
 
 export interface CartItem {
   product: Product;
@@ -38,6 +40,7 @@ export default function CartSidebar({
   onTableChange,
   isSubmitting,
 }: CartSidebarProps) {
+  const { language } = useTranslation();
   // Calculate total with variation prices
   const total = items.reduce((sum, item) => {
     const price = item.variation ? item.variation.price : item.product.price;
@@ -166,16 +169,16 @@ export default function CartSidebar({
               }}>
                 <ShoppingCart style={{ width: '28px', height: '28px', color: '#94a3b8' }} />
               </div>
-              <p style={{ fontSize: '15px', fontWeight: 600, color: '#475569' }}>السلة فارغة</p>
-              <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>أضف منتجات للطلب</p>
+              <p style={{ fontSize: '15px', fontWeight: 600, color: '#475569' }}>{language === 'ar' ? 'السلة فارغة' : 'Cart is empty'}</p>
+              <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>{language === 'ar' ? 'أضف منتجات للطلب' : 'Add products to order'}</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {items.map((item) => {
                 const price = item.variation ? item.variation.price : item.product.price;
                 const displayName = item.variation 
-                  ? `${item.product.name} - ${item.variation.name}`
-                  : item.product.name;
+                  ? `${getLocalizedName(item.product, language)} - ${getLocalizedName(item.variation, language)}`
+                  : getLocalizedName(item.product, language);
                 
                 return (
                   <div
@@ -224,7 +227,7 @@ export default function CartSidebar({
                           color: '#0f172a',
                           marginBottom: '4px',
                         }}>
-                          {item.product.name}
+                          {getLocalizedName(item.product, language)}
                         </h4>
                         {/* Variation Badge */}
                         {item.variation && (
@@ -241,7 +244,7 @@ export default function CartSidebar({
                             marginBottom: '4px',
                           }}>
                             <Layers style={{ width: '10px', height: '10px' }} />
-                            {item.variation.name}
+                            {getLocalizedName(item.variation, language)}
                           </div>
                         )}
                         <div style={{ fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>

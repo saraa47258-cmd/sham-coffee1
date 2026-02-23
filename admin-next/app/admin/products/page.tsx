@@ -16,6 +16,8 @@ import {
   Category 
 } from '@/lib/firebase/database';
 import Topbar from '@/lib/components/Topbar';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { getLocalizedName, getLocalizedDescription, getLocalizedCategoryName } from '@/lib/utils/localized';
 import CategoryModal from '@/lib/components/admin/CategoryModal';
 import ProductModal from '@/lib/components/admin/ProductModal';
 import DeleteCategoryModal from '@/lib/components/admin/DeleteCategoryModal';
@@ -38,6 +40,7 @@ type ViewMode = 'grid' | 'list';
 type TabMode = 'products' | 'categories';
 
 export default function MenuManagerPage() {
+  const { t, language } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +130,7 @@ export default function MenuManagerPage() {
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا المنتج؟')) return;
+    if (!confirm(t.products.confirmDelete)) return;
     await deleteProduct(productId);
     await loadData();
   };
@@ -153,7 +156,9 @@ export default function MenuManagerPage() {
       const searchLower = search.toLowerCase();
       return (
         product.name.toLowerCase().includes(searchLower) ||
-        product.description?.toLowerCase().includes(searchLower)
+        product.nameEn?.toLowerCase().includes(searchLower) ||
+        product.description?.toLowerCase().includes(searchLower) ||
+        product.descriptionEn?.toLowerCase().includes(searchLower)
       );
     }
     return true;
@@ -161,7 +166,7 @@ export default function MenuManagerPage() {
 
   const getCategoryName = (categoryId: string) => {
     const cat = categories.find(c => c.id === categoryId);
-    return cat ? `${cat.icon || cat.emoji || ''} ${cat.name}` : categoryId;
+    return cat ? getLocalizedCategoryName(cat, language) : categoryId;
   };
 
   const getProductCountForCategory = (categoryId: string) => {
@@ -181,7 +186,7 @@ export default function MenuManagerPage() {
             animation: 'spin 1s linear infinite',
             margin: '0 auto',
           }}></div>
-          <p style={{ marginTop: '16px', fontSize: '14px', color: '#64748b' }}>جاري التحميل...</p>
+          <p style={{ marginTop: '16px', fontSize: '14px', color: '#64748b' }}>{t.common.loading}</p>
         </div>
         <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -190,7 +195,7 @@ export default function MenuManagerPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Topbar title="إدارة القائمة" subtitle="إدارة التصنيفات والمنتجات" />
+      <Topbar title={t.products.title} subtitle={t.products.subtitle} />
 
       <div style={{ padding: '24px' }}>
         {/* Tabs */}
@@ -221,7 +226,7 @@ export default function MenuManagerPage() {
             }}
           >
             <Package style={{ width: '18px', height: '18px' }} />
-            المنتجات ({products.length})
+            {t.nav.products} ({products.length})
           </button>
           <button
             onClick={() => setActiveTab('categories')}
@@ -241,7 +246,7 @@ export default function MenuManagerPage() {
             }}
           >
             <Grid3X3 style={{ width: '18px', height: '18px' }} />
-            التصنيفات ({categories.length})
+            {t.products.categories} ({categories.length})
           </button>
         </div>
 
@@ -277,7 +282,7 @@ export default function MenuManagerPage() {
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="ابحث عن منتج..."
+                    placeholder={language === 'ar' ? 'ابحث عن منتج...' : 'Search for product...'}
                     style={{
                       flex: 1,
                       border: 'none',
@@ -305,10 +310,10 @@ export default function MenuManagerPage() {
                     minWidth: '160px',
                   }}
                 >
-                  <option value="all">جميع التصنيفات</option>
+                  <option value="all">{t.menuView.allCategories}</option>
                   {categories.map((cat) => (
                     <option key={cat.id} value={cat.id}>
-                      {cat.icon || cat.emoji} {cat.name}
+                      {getLocalizedCategoryName(cat, language)}
                     </option>
                   ))}
                 </select>
@@ -328,9 +333,9 @@ export default function MenuManagerPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  <option value="all">الكل</option>
-                  <option value="active">نشط</option>
-                  <option value="inactive">غير نشط</option>
+                  <option value="all">{t.common.all}</option>
+                  <option value="active">{t.common.active}</option>
+                  <option value="inactive">{t.common.inactive}</option>
                 </select>
               </div>
 
@@ -393,7 +398,7 @@ export default function MenuManagerPage() {
                   }}
                 >
                   <Plus style={{ width: '18px', height: '18px' }} />
-                  إضافة منتج
+                  {t.products.addProduct}
                 </button>
               </div>
             </div>
@@ -408,8 +413,8 @@ export default function MenuManagerPage() {
                 border: '1px solid #e2e8f0',
               }}>
                 <Package style={{ width: '48px', height: '48px', color: '#94a3b8', margin: '0 auto 16px' }} />
-                <p style={{ fontSize: '16px', fontWeight: 600, color: '#475569' }}>لا توجد منتجات</p>
-                <p style={{ fontSize: '14px', color: '#94a3b8', marginTop: '4px' }}>أضف منتجات جديدة للبدء</p>
+                <p style={{ fontSize: '16px', fontWeight: 600, color: '#475569' }}>{t.products.noProducts}</p>
+                <p style={{ fontSize: '14px', color: '#94a3b8', marginTop: '4px' }}>{language === 'ar' ? 'أضف منتجات جديدة للبدء' : 'Add new products to get started'}</p>
               </div>
             ) : viewMode === 'grid' ? (
               <div style={{
@@ -460,7 +465,7 @@ export default function MenuManagerPage() {
                           fontWeight: 600,
                           color: '#ffffff',
                         }}>
-                          {product.variations.length} خيارات
+                          {product.variations.length} {language === 'ar' ? 'خيارات' : 'options'}
                         </div>
                       )}
                     </div>
@@ -475,7 +480,7 @@ export default function MenuManagerPage() {
                       }}>
                         <div>
                           <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
-                            {product.name}
+                            {getLocalizedName(product, language)}
                           </h3>
                           <p style={{ fontSize: '12px', color: '#94a3b8' }}>
                             {getCategoryName(product.category || product.categoryId || '')}
@@ -520,7 +525,7 @@ export default function MenuManagerPage() {
                           }}
                         >
                           <Edit2 style={{ width: '14px', height: '14px' }} />
-                          تعديل
+                          {t.common.edit}
                         </button>
                         <button
                           onClick={() => handleToggleProductStatus(product)}
@@ -565,15 +570,16 @@ export default function MenuManagerPage() {
                 border: '1px solid #e2e8f0',
                 overflow: 'hidden',
               }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>المنتج</th>
-                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>التصنيف</th>
-                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>السعر</th>
-                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>الخيارات</th>
-                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>الحالة</th>
-                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>الإجراءات</th>
+                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>{t.dashboard.product}</th>
+                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>{t.common.category}</th>
+                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>{t.common.price}</th>
+                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>{language === 'ar' ? 'الخيارات' : 'Options'}</th>
+                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>{t.common.status}</th>
+                      <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>{t.common.actions}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -601,10 +607,10 @@ export default function MenuManagerPage() {
                               )}
                             </div>
                             <div>
-                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{product.name}</div>
-                              {product.description && (
+                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{getLocalizedName(product, language)}</div>
+                              {(product.description || product.descriptionEn) && (
                                 <div style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {product.description}
+                                  {getLocalizedDescription(product, language)}
                                 </div>
                               )}
                             </div>
@@ -614,10 +620,10 @@ export default function MenuManagerPage() {
                           {getCategoryName(product.category || product.categoryId || '')}
                         </td>
                         <td style={{ padding: '14px 20px', fontSize: '14px', fontWeight: 600, color: '#16a34a' }}>
-                          {product.price.toFixed(3)} ر.ع
+                          {product.price.toFixed(3)} {t.common.currency}
                         </td>
                         <td style={{ padding: '14px 20px', fontSize: '13px', color: '#64748b' }}>
-                          {product.variations?.length || 0} خيار
+                          {product.variations?.length || 0} {language === 'ar' ? 'خيار' : 'option'}
                         </td>
                         <td style={{ padding: '14px 20px' }}>
                           <span style={{
@@ -628,7 +634,7 @@ export default function MenuManagerPage() {
                             backgroundColor: (product.isActive ?? product.active) ? '#dcfce7' : '#f1f5f9',
                             color: (product.isActive ?? product.active) ? '#16a34a' : '#64748b',
                           }}>
-                            {(product.isActive ?? product.active) ? 'نشط' : 'غير نشط'}
+                            {(product.isActive ?? product.active) ? t.common.active : t.common.inactive}
                           </span>
                         </td>
                         <td style={{ padding: '14px 20px' }}>
@@ -668,6 +674,7 @@ export default function MenuManagerPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
           </>
@@ -704,7 +711,7 @@ export default function MenuManagerPage() {
                 }}
               >
                 <FolderPlus style={{ width: '18px', height: '18px' }} />
-                إضافة تصنيف
+                {t.products.addCategory}
               </button>
             </div>
 
@@ -718,8 +725,8 @@ export default function MenuManagerPage() {
                 border: '1px solid #e2e8f0',
               }}>
                 <Grid3X3 style={{ width: '48px', height: '48px', color: '#94a3b8', margin: '0 auto 16px' }} />
-                <p style={{ fontSize: '16px', fontWeight: 600, color: '#475569' }}>لا توجد تصنيفات</p>
-                <p style={{ fontSize: '14px', color: '#94a3b8', marginTop: '4px' }}>أضف تصنيفات لتنظيم المنتجات</p>
+                <p style={{ fontSize: '16px', fontWeight: 600, color: '#475569' }}>{language === 'ar' ? 'لا توجد تصنيفات' : 'No categories'}</p>
+                <p style={{ fontSize: '14px', color: '#94a3b8', marginTop: '4px' }}>{language === 'ar' ? 'أضف تصنيفات لتنظيم المنتجات' : 'Add categories to organize products'}</p>
               </div>
             ) : (
               <div style={{
@@ -759,10 +766,13 @@ export default function MenuManagerPage() {
                         </div>
                         <div>
                           <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
-                            {category.name}
+                            {getLocalizedName(category, language)}
                           </h3>
-                          {category.nameEn && (
+                          {language === 'ar' && category.nameEn && (
                             <p style={{ fontSize: '12px', color: '#94a3b8' }}>{category.nameEn}</p>
+                          )}
+                          {language === 'en' && category.name && category.nameEn && (
+                            <p style={{ fontSize: '12px', color: '#94a3b8' }}>{category.name}</p>
                           )}
                         </div>
                       </div>
@@ -774,7 +784,7 @@ export default function MenuManagerPage() {
                         backgroundColor: (category.isActive ?? category.active) ? '#dcfce7' : '#f1f5f9',
                         color: (category.isActive ?? category.active) ? '#16a34a' : '#64748b',
                       }}>
-                        {(category.isActive ?? category.active) ? 'نشط' : 'غير نشط'}
+                        {(category.isActive ?? category.active) ? t.common.active : t.common.inactive}
                       </span>
                     </div>
 
@@ -784,7 +794,7 @@ export default function MenuManagerPage() {
                       justifyContent: 'space-between',
                     }}>
                       <div style={{ fontSize: '13px', color: '#64748b' }}>
-                        {getProductCountForCategory(category.id)} منتج
+                        {getProductCountForCategory(category.id)} {t.dashboard.product}
                       </div>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button
@@ -806,7 +816,7 @@ export default function MenuManagerPage() {
                           }}
                         >
                           <Edit2 style={{ width: '14px', height: '14px' }} />
-                          تعديل
+                          {t.common.edit}
                         </button>
                         <button
                           onClick={() => handleDeleteCategoryClick(category)}

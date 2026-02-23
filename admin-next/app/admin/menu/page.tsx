@@ -8,8 +8,10 @@ import ProductCard from '@/lib/components/menu/ProductCard';
 import ProductModal from '@/lib/components/menu/ProductModal';
 import SearchBar from '@/lib/components/menu/SearchBar';
 import { Coffee, Package } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
 
 export default function CustomerMenuPage() {
+  const { t, language } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +98,7 @@ export default function CustomerMenuPage() {
           }}>
             <Coffee style={{ width: '28px', height: '28px', color: '#ffffff' }} />
           </div>
-          <p style={{ fontSize: '14px', color: '#64748b' }}>جاري تحميل المنيو...</p>
+          <p style={{ fontSize: '14px', color: '#64748b' }}>{t.common.loading}</p>
         </div>
         <style jsx>{`
           @keyframes pulse {
@@ -110,7 +112,7 @@ export default function CustomerMenuPage() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f1f5f9' }}>
-      <Topbar title="المنيو" subtitle="استعرض قائمة المنتجات" />
+      <Topbar title={t.menuView.title} subtitle={t.menuView.subtitle} />
 
       <div style={{ padding: '24px' }}>
         {/* Search */}
@@ -118,7 +120,7 @@ export default function CustomerMenuPage() {
           <SearchBar
             value={search}
             onChange={setSearch}
-            placeholder="ابحث عن منتج..."
+            placeholder={t.menuView.searchPlaceholder}
           />
         </div>
 
@@ -141,7 +143,7 @@ export default function CustomerMenuPage() {
           color: '#64748b',
         }}>
           <Package style={{ width: '18px', height: '18px' }} />
-          <span>{filteredProducts.length} منتج</span>
+          <span>{filteredProducts.length} {t.dashboard.product}</span>
         </div>
 
         {/* Products Grid */}
@@ -166,10 +168,10 @@ export default function CustomerMenuPage() {
               <Package style={{ width: '28px', height: '28px', color: '#94a3b8' }} />
             </div>
             <p style={{ fontSize: '16px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              لا توجد منتجات
+              {t.products.noProducts}
             </p>
             <p style={{ fontSize: '14px', color: '#94a3b8' }}>
-              جرب البحث بكلمة أخرى أو اختر تصنيف مختلف
+              {language === 'ar' ? 'جرب البحث بكلمة أخرى أو اختر تصنيف مختلف' : 'Try a different search or select another category'}
             </p>
           </div>
         ) : (

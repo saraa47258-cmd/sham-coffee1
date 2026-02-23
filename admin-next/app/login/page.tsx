@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginAdmin } from '@/lib/auth';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import LanguageSwitcher from '@/lib/components/LanguageSwitcher';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const { t, isRtl } = useTranslation();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -21,12 +24,30 @@ export default function LoginPage() {
     const password = formData.get('password') as string;
 
     try {
-      await loginAdmin(username, password);
-      // Use full page reload to ensure AuthContext is refreshed
-      window.location.href = '/admin';
+      console.log('🔐 Attempting login with:', username);
+      const user = await loginAdmin(username, password);
+      console.log('✅ Login successful:', user?.name, user?.role);
+      
+      // تأكد من حفظ البيانات
+      const savedData = sessionStorage.getItem('auth_user_data');
+      const savedLocal = localStorage.getItem('auth_user_data');
+      console.log('📦 Session stored:', !!savedData, '| Local stored:', !!savedLocal);
+      
+      if (!savedData && !savedLocal) {
+        setError(t.auth.loginError);
+        setLoading(false);
+        return;
+      }
+      
+      // انتظر قليلاً ثم قم بالتوجيه
+      console.log('🚀 Waiting before redirect...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('🚀 Redirecting to /admin/...');
+      window.location.replace('/admin/');
     } catch (err: any) {
-      setError(err.message || 'حدث خطأ في تسجيل الدخول');
-    } finally {
+      console.error('❌ Login error:', err);
+      setError(err.message || t.auth.loginError);
       setLoading(false);
     }
   };
@@ -158,14 +179,14 @@ export default function LoginPage() {
             marginBottom: '8px',
             letterSpacing: '-0.5px',
           }}>
-            قهوة الشام
+            {t.auth.loginTitle}
           </h1>
           <p style={{
             fontSize: '15px',
             color: 'rgba(148, 163, 184, 0.8)',
             fontWeight: 400,
           }}>
-            تسجيل الدخول إلى لوحة التحكم
+            {t.auth.loginSubtitle}
           </p>
         </div>
 
@@ -213,14 +234,14 @@ export default function LoginPage() {
                 color: '#94a3b8',
                 marginBottom: '10px',
               }}>
-                اسم المستخدم
+                {t.auth.username}
               </label>
               <div style={{
                 position: 'relative',
               }}>
                 <div style={{
                   position: 'absolute',
-                  right: '16px',
+                  ...(isRtl ? { right: '16px' } : { left: '16px' }),
                   top: '50%',
                   transform: 'translateY(-50%)',
                   color: focusedField === 'username' ? '#a855f7' : '#64748b',
@@ -238,10 +259,10 @@ export default function LoginPage() {
                   autoComplete="username"
                   onFocus={() => setFocusedField('username')}
                   onBlur={() => setFocusedField(null)}
-                  placeholder="أدخل اسم المستخدم"
+                  placeholder={t.auth.username}
                   style={{
                     width: '100%',
-                    padding: '16px 48px 16px 16px',
+                    padding: isRtl ? '16px 48px 16px 16px' : '16px 16px 16px 48px',
                     backgroundColor: 'rgba(30, 41, 59, 0.5)',
                     border: focusedField === 'username' 
                       ? '2px solid rgba(168, 85, 247, 0.5)' 
@@ -268,14 +289,14 @@ export default function LoginPage() {
                 color: '#94a3b8',
                 marginBottom: '10px',
               }}>
-                كلمة المرور
+                {t.auth.password}
               </label>
               <div style={{
                 position: 'relative',
               }}>
                 <div style={{
                   position: 'absolute',
-                  right: '16px',
+                  ...(isRtl ? { right: '16px' } : { left: '16px' }),
                   top: '50%',
                   transform: 'translateY(-50%)',
                   color: focusedField === 'password' ? '#a855f7' : '#64748b',
@@ -293,7 +314,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
-                  placeholder="أدخل كلمة المرور"
+                  placeholder={t.auth.password}
                   style={{
                     width: '100%',
                     padding: '16px 48px',
@@ -316,7 +337,7 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   style={{
                     position: 'absolute',
-                    left: '16px',
+                    ...(isRtl ? { left: '16px' } : { right: '16px' }),
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
@@ -393,12 +414,12 @@ export default function LoginPage() {
                     borderRadius: '50%',
                     animation: 'spin 0.8s linear infinite',
                   }} />
-                  جاري تسجيل الدخول...
+                  {t.auth.loggingIn}
                 </>
               ) : (
                 <>
-                  تسجيل الدخول
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: 'rotate(180deg)' }}>
+                  {t.auth.loginButton}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isRtl ? 'rotate(180deg)' : 'none' }}>
                     <line x1="5" x2="19" y1="12" y2="12" />
                     <polyline points="12 5 19 12 12 19" />
                   </svg>
@@ -415,8 +436,13 @@ export default function LoginPage() {
           color: 'rgba(100, 116, 139, 0.6)',
           marginTop: '32px',
         }}>
-          © 2026 قهوة الشام. جميع الحقوق محفوظة.
+          © 2026 {t.common.appName}
         </p>
+
+        {/* Language Switcher */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+          <LanguageSwitcher variant="topbar" />
+        </div>
       </div>
 
       {/* CSS Animations */}

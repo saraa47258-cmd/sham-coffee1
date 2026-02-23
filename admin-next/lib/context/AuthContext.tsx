@@ -23,6 +23,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { isAuthenticated, user: userData } = await checkAuth();
         if (isAuthenticated && userData) {
+          // Ensure detailedPermissions are loaded
+          if (!userData.detailedPermissions && userData.role !== 'admin' && userData.id) {
+            try {
+              const { getWorker, getFullPermissions, getDefaultWorkerPermissions } = await import('../firebase/database');
+              const worker = await getWorker(userData.id);
+              
+              if (worker) {
+                if (worker.detailedPermissions) {
+                  userData.detailedPermissions = worker.detailedPermissions;
+                } else if (worker.permissions === 'full') {
+                  userData.detailedPermissions = getFullPermissions();
+                } else {
+                  userData.detailedPermissions = getDefaultWorkerPermissions();
+                }
+              }
+            } catch (error) {
+              console.error('Error loading permissions in AuthContext:', error);
+            }
+          }
           setUser(userData);
         } else {
           setUser(null);

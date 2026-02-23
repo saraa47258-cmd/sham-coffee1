@@ -1,0 +1,118 @@
+# ====================================
+# Docker Compose - Sham Coffee
+# نظام قهوة الشام
+# ====================================
+
+services:
+  # ====================================
+  # التطبيق الرئيسي - Next.js Admin
+  # ====================================
+  admin-app:
+    build:
+      context: ./admin-next
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        - NEXT_PUBLIC_FIREBASE_API_KEY=${FIREBASE_API_KEY:-AIzaSyBD3RarLj_696emYW84zZ1tliP_Th1z6mM}
+        - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN:-sham-coffee.firebaseapp.com}
+        - NEXT_PUBLIC_FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL:-https://sham-coffee-default-rtdb.firebaseio.com}
+        - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-sham-coffee}
+        - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET:-sham-coffee.firebasestorage.app}
+        - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID:-483086837036}
+        - NEXT_PUBLIC_FIREBASE_APP_ID=${FIREBASE_APP_ID:-1:483086837036:web:2a6bf9084050ef399ef889}
+    container_name: sham-coffee-admin
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_FIREBASE_API_KEY=${FIREBASE_API_KEY:-AIzaSyBD3RarLj_696emYW84zZ1tliP_Th1z6mM}
+      - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN:-sham-coffee.firebaseapp.com}
+      - NEXT_PUBLIC_FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL:-https://sham-coffee-default-rtdb.firebaseio.com}
+      - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-sham-coffee}
+      - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET:-sham-coffee.firebasestorage.app}
+      - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID:-483086837036}
+      - NEXT_PUBLIC_FIREBASE_APP_ID=${FIREBASE_APP_ID:-1:483086837036:web:2a6bf9084050ef399ef889}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - sham-network
+
+  # ====================================
+  # بناء ونشر Firebase Hosting
+  # ====================================
+  firebase-deploy:
+    build:
+      context: ./admin-next
+      dockerfile: Dockerfile
+      target: firebase-builder
+      args:
+        - NEXT_PUBLIC_FIREBASE_API_KEY=${FIREBASE_API_KEY:-AIzaSyBD3RarLj_696emYW84zZ1tliP_Th1z6mM}
+        - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN:-sham-coffee.firebaseapp.com}
+        - NEXT_PUBLIC_FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL:-https://sham-coffee-default-rtdb.firebaseio.com}
+        - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-sham-coffee}
+        - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET:-sham-coffee.firebasestorage.app}
+        - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID:-483086837036}
+        - NEXT_PUBLIC_FIREBASE_APP_ID=${FIREBASE_APP_ID:-1:483086837036:web:2a6bf9084050ef399ef889}
+    container_name: sham-coffee-firebase-deploy
+    volumes:
+      - ./admin-next/build:/app/build:rw
+      - firebase-cache:/root/.cache
+    profiles:
+      - deploy
+    networks:
+      - sham-network
+
+  # ====================================
+  # خدمة النسخ الاحتياطي
+  # ====================================
+  backup-service:
+    image: node:20-alpine
+    container_name: sham-coffee-backup
+    working_dir: /app
+    volumes:
+      - ./admin-next:/app
+      - ./firebase-backups:/backups
+    command: >
+      sh -c "
+        npm install &&
+        node scripts/backup-firebase.js &&
+        cp -r backups/* /backups/ 2>/dev/null || true
+      "
+    profiles:
+      - backup
+    networks:
+      - sham-network
+
+  # ====================================
+  # خدمة استعادة البيانات
+  # ====================================
+  restore-service:
+    image: node:20-alpine
+    container_name: sham-coffee-restore
+    working_dir: /app
+    volumes:
+      - ./admin-next:/app
+      - ./firebase-backups:/backups:ro
+    environment:
+      - BACKUP_FOLDER=${BACKUP_FOLDER:-latest}
+    command: >
+      sh -c "
+        npm install &&
+        node scripts/restore-firebase.js /backups/${BACKUP_FOLDER}
+      "
+    profiles:
+      - restore
+    networks:
+      - sham-network
+
+networks:
+  sham-network:
+    driver: bridge
+
+volumes:
+  firebase-cache:
+    driver: local

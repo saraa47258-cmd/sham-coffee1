@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Product, ProductVariation } from '@/lib/firebase/database';
 import { X, Plus, Minus, ShoppingCart, FileText } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { getLocalizedName, getLocalizedDescription } from '@/lib/utils/localized';
 
 interface VariationModalProps {
   product: Product;
@@ -16,6 +18,7 @@ interface VariationModalProps {
 }
 
 export default function VariationModal({ product, onClose, onAddToCart }: VariationModalProps) {
+  const { language } = useTranslation();
   const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState('');
@@ -134,11 +137,11 @@ export default function VariationModal({ product, onClose, onAddToCart }: Variat
             </div>
             <div>
               <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                {product.name}
+                {getLocalizedName(product, language)}
               </h2>
-              {product.description && (
+              {getLocalizedDescription(product, language) && (
                 <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
-                  {product.description.slice(0, 40)}{product.description.length > 40 ? '...' : ''}
+                  {getLocalizedDescription(product, language).slice(0, 40)}{getLocalizedDescription(product, language).length > 40 ? '...' : ''}
                 </p>
               )}
             </div>
@@ -200,7 +203,7 @@ export default function VariationModal({ product, onClose, onAddToCart }: Variat
                       color: selectedVariation?.id === variation.id ? '#4f46e5' : '#0f172a',
                       margin: 0,
                     }}>
-                      {variation.name}
+                      {getLocalizedName(variation, language)}
                     </p>
                     <p style={{
                       fontSize: '13px',

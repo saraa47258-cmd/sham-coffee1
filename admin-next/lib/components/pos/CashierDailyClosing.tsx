@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { 
   createEnhancedDailyClosing, 
   isDayClosed,
+  getTodaySalesForClosing,
   DailyClosing 
 } from '@/lib/reports';
+import * as PC from '@/lib/utils/precision';
 import { 
   X, 
   Calendar, 
@@ -23,6 +25,7 @@ import {
   Receipt,
   TrendingUp
 } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
 
 interface CashierDailyClosingProps {
   onClose: () => void;
@@ -37,6 +40,7 @@ export default function CashierDailyClosing({
   userId,
   userName,
 }: CashierDailyClosingProps) {
+  const { t, language } = useTranslation();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [openingCash, setOpeningCash] = useState('0');
   const [cashSales, setCashSales] = useState('0');
@@ -55,27 +59,70 @@ export default function CashierDailyClosing({
   const [step, setStep] = useState<'input' | 'confirm'>('input');
   const [alreadyClosed, setAlreadyClosed] = useState(false);
   const [checkingClosed, setCheckingClosed] = useState(true);
+  const [loadingData, setLoadingData] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Check if day is already closed
+  // Check if day is already closed and auto-load data
   useEffect(() => {
-    checkIfClosed();
+    checkIfClosedAndLoadData();
   }, [date]);
 
-  const checkIfClosed = async () => {
+  const checkIfClosedAndLoadData = async () => {
     setCheckingClosed(true);
+    setLoadingData(true);
+    setDataLoaded(false);
     try {
       const closed = await isDayClosed(date);
       setAlreadyClosed(closed);
+      
+      if (!closed) {
+        // جلب بيانات المبيعات المحسوبة تلقائياً من الطلبات
+        const salesData = await getTodaySalesForClosing(date);
+        setCashSales(PC.format(salesData.cashSales));
+        setCardSales(PC.format(salesData.cardSales));
+        setOrdersCount(salesData.ordersCount.toString());
+        setPaidOrdersCount(salesData.paidOrdersCount.toString());
+        setUnpaidOrdersCount(salesData.unpaidOrdersCount.toString());
+        setTableOrdersCount(salesData.tableOrdersCount.toString());
+        setRoomOrdersCount(salesData.roomOrdersCount.toString());
+        setTakeawayOrdersCount(salesData.takeawayOrdersCount.toString());
+        setDataLoaded(true);
+      }
     } catch (error) {
-      console.error('Error checking if day is closed:', error);
+      // ignore
     } finally {
       setCheckingClosed(false);
+      setLoadingData(false);
     }
   };
 
-  const totalSales = parseFloat(cashSales || '0') + parseFloat(cardSales || '0');
-  const expectedCash = parseFloat(openingCash || '0') + parseFloat(cashSales || '0') - parseFloat(expenses || '0');
-  const difference = parseFloat(actualCash || '0') - expectedCash;
+  const reloadData = async () => {
+    if (loadingData) return;
+    setLoadingData(true);
+    try {
+      const salesData = await getTodaySalesForClosing(date);
+      setCashSales(PC.format(salesData.cashSales));
+      setCardSales(PC.format(salesData.cardSales));
+      setOrdersCount(salesData.ordersCount.toString());
+      setPaidOrdersCount(salesData.paidOrdersCount.toString());
+      setUnpaidOrdersCount(salesData.unpaidOrdersCount.toString());
+      setTableOrdersCount(salesData.tableOrdersCount.toString());
+      setRoomOrdersCount(salesData.roomOrdersCount.toString());
+      setTakeawayOrdersCount(salesData.takeawayOrdersCount.toString());
+      setDataLoaded(true);
+    } catch (error) {
+      // ignore
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const totalSales = PC.add(parseFloat(cashSales || '0'), parseFloat(cardSales || '0'));
+  const expectedCash = PC.subtract(
+    PC.add(parseFloat(openingCash || '0'), parseFloat(cashSales || '0')),
+    parseFloat(expenses || '0')
+  );
+  const difference = PC.subtract(parseFloat(actualCash || '0'), expectedCash);
 
   const handleSubmit = async () => {
     if (step === 'input') {
@@ -93,10 +140,10 @@ export default function CashierDailyClosing({
         openingCash: parseFloat(openingCash || '0'),
         cashSales: parseFloat(cashSales || '0'),
         cardSales: parseFloat(cardSales || '0'),
-        totalSales,
+        totalSales: PC.add(parseFloat(cashSales || '0'), parseFloat(cardSales || '0')),
         expenses: parseFloat(expenses || '0'),
         actualCash: parseFloat(actualCash || '0'),
-        difference,
+        difference: PC.subtract(parseFloat(actualCash || '0'), expectedCash),
         notes: notes || undefined,
         closedBy: userId,
         closedByName: userName,
@@ -112,7 +159,7 @@ export default function CashierDailyClosing({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'حدث خطأ أثناء الإغلاق');
+      setError(err.message || t.common.error);
       setStep('input');
     } finally {
       setLoading(false);
@@ -173,10 +220,10 @@ export default function CashierDailyClosing({
             </div>
             <div>
               <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
-                إغلاق اليوم (يدوي)
+                {language === 'ar' ? `إغلاق اليوم ${dataLoaded ? '' : '(يدوي)'}` : `Close Day ${dataLoaded ? '' : '(Manual)'}`}
               </h2>
               <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
-                {step === 'input' ? 'إدخال بيانات المبيعات يدوياً' : 'تأكيد وإغلاق اليوم'}
+                {step === 'input' ? (dataLoaded ? (language === 'ar' ? 'بيانات من النظام - يمكنك تعديلها' : 'System data - you can edit') : (language === 'ar' ? 'إدخال بيانات المبيعات يدوياً' : 'Enter sales data manually')) : t.reports.confirmAndClose}
               </p>
             </div>
           </div>
@@ -204,7 +251,7 @@ export default function CashierDailyClosing({
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           {checkingClosed ? (
             <div style={{ textAlign: 'center', padding: '48px' }}>
-              <p style={{ color: '#64748b' }}>جاري التحقق...</p>
+              <p style={{ color: '#64748b' }}>{t.common.loading}</p>
             </div>
           ) : alreadyClosed ? (
             <div style={{
@@ -224,10 +271,10 @@ export default function CashierDailyClosing({
                 <CheckCircle style={{ width: '40px', height: '40px', color: '#ffffff' }} />
               </div>
               <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-                تم إغلاق هذا اليوم
+                {t.reports.alreadyClosed}
               </h3>
               <p style={{ fontSize: '14px', color: '#64748b' }}>
-                لا يمكن إجراء إغلاق آخر لنفس اليوم
+                {language === 'ar' ? 'لا يمكن إجراء إغلاق آخر لنفس اليوم' : 'Cannot perform another closing for the same day'}
               </p>
             </div>
           ) : (
@@ -260,7 +307,7 @@ export default function CashierDailyClosing({
                   marginBottom: '10px',
                 }}>
                   <Calendar style={{ width: '16px', height: '16px' }} />
-                  تاريخ الإغلاق
+                  {t.reports.closingDate}
                 </label>
                 <input
                   type="date"
@@ -292,13 +339,38 @@ export default function CashierDailyClosing({
                 <div style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
+                  justifyContent: 'space-between',
                   gap: '10px', 
                   marginBottom: '20px',
                 }}>
-                  <TrendingUp style={{ width: '22px', height: '22px', color: '#16a34a' }} />
-                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#16a34a' }}>
-                    بيانات المبيعات (إدخال يدوي)
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <TrendingUp style={{ width: '22px', height: '22px', color: '#16a34a' }} />
+                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#16a34a' }}>
+                      {language === 'ar' ? `بيانات المبيعات ${dataLoaded ? '(من النظام)' : '(إدخال يدوي)'}` : `Sales Data ${dataLoaded ? '(From System)' : '(Manual Entry)'}`}
+                    </span>
+                  </div>
+                  {step !== 'confirm' && (
+                    <button
+                      type="button"
+                      onClick={reloadData}
+                      disabled={loadingData}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        backgroundColor: loadingData ? '#e2e8f0' : '#dcfce7',
+                        border: '1px solid #86efac',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#16a34a',
+                        cursor: loadingData ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {loadingData ? t.common.loading : t.common.refresh}
+                    </button>
+                  )}
                 </div>
 
                 {/* Sales Amount Inputs */}
@@ -319,7 +391,7 @@ export default function CashierDailyClosing({
                       marginBottom: '8px',
                     }}>
                       <Banknote style={{ width: '14px', height: '14px', color: '#3b82f6' }} />
-                      المبيعات النقدية
+                      {t.reports.cashSales}
                     </label>
                     <input
                       type="number"
@@ -351,7 +423,7 @@ export default function CashierDailyClosing({
                       marginBottom: '8px',
                     }}>
                       <CreditCard style={{ width: '14px', height: '14px', color: '#8b5cf6' }} />
-                      مبيعات البطاقة
+                      {t.reports.cardSales}
                     </label>
                     <input
                       type="number"
@@ -383,7 +455,7 @@ export default function CashierDailyClosing({
                       marginBottom: '8px',
                     }}>
                       <ShoppingBag style={{ width: '14px', height: '14px', color: '#6366f1' }} />
-                      عدد الطلبات
+                      {t.reports.ordersCount}
                     </label>
                     <input
                       type="number"
@@ -413,11 +485,11 @@ export default function CashierDailyClosing({
                   marginBottom: '16px',
                 }}>
                   <p style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '12px' }}>
-                    تفاصيل الطلبات (اختياري)
+                    {language === 'ar' ? 'تفاصيل الطلبات (اختياري)' : 'Order Details (Optional)'}
                   </p>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
                     <div>
-                      <label style={{ fontSize: '11px', color: '#64748b' }}>طلبات مدفوعة</label>
+                      <label style={{ fontSize: '11px', color: '#64748b' }}>{t.reports.paidOrdersCount}</label>
                       <input
                         type="number"
                         value={paidOrdersCount}
@@ -436,7 +508,7 @@ export default function CashierDailyClosing({
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '11px', color: '#64748b' }}>طلبات معلقة</label>
+                      <label style={{ fontSize: '11px', color: '#64748b' }}>{t.reports.unpaidOrdersCount}</label>
                       <input
                         type="number"
                         value={unpaidOrdersCount}
@@ -461,7 +533,7 @@ export default function CashierDailyClosing({
                         value={tableOrdersCount}
                         onChange={(e) => setTableOrdersCount(e.target.value)}
                         min="0"
-                        placeholder="طاولات"
+                        placeholder={t.reports.tableOrders}
                         disabled={step === 'confirm'}
                         style={{
                           width: '100%',
@@ -483,7 +555,7 @@ export default function CashierDailyClosing({
                         value={roomOrdersCount}
                         onChange={(e) => setRoomOrdersCount(e.target.value)}
                         min="0"
-                        placeholder="غرف"
+                        placeholder={t.reports.roomOrders}
                         disabled={step === 'confirm'}
                         style={{
                           width: '100%',
@@ -503,7 +575,7 @@ export default function CashierDailyClosing({
                         value={takeawayOrdersCount}
                         onChange={(e) => setTakeawayOrdersCount(e.target.value)}
                         min="0"
-                        placeholder="تيك أواي"
+                        placeholder={t.reports.takeawayOrders}
                         disabled={step === 'confirm'}
                         style={{
                           width: '100%',
@@ -528,10 +600,10 @@ export default function CashierDailyClosing({
                   color: '#ffffff',
                 }}>
                   <p style={{ fontSize: '12px', opacity: 0.9, marginBottom: '4px' }}>
-                    إجمالي المبيعات
+                    {t.reports.totalSales}
                   </p>
                   <p style={{ fontSize: '32px', fontWeight: 700, margin: 0 }}>
-                    {totalSales.toFixed(3)} ر.ع
+                    {PC.format(totalSales)} {t.common.currency}
                   </p>
                 </div>
               </div>
@@ -546,13 +618,13 @@ export default function CashierDailyClosing({
               }}>
                 <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#92400e', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Calculator style={{ width: '18px', height: '18px' }} />
-                  تسوية الصندوق
+                  {t.reports.cashReconciliation}
                 </h4>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                      رصيد الافتتاح
+                      {t.reports.openingCash}
                     </label>
                     <input
                       type="number"
@@ -574,7 +646,7 @@ export default function CashierDailyClosing({
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                      المصروفات
+                      {t.reports.expenses}
                     </label>
                     <input
                       type="number"
@@ -598,7 +670,7 @@ export default function CashierDailyClosing({
 
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                    النقد الفعلي في الصندوق
+                    {t.reports.actualCash}
                   </label>
                   <input
                     type="number"
@@ -624,22 +696,22 @@ export default function CashierDailyClosing({
                 {/* Difference Display */}
                 <div style={{
                   padding: '16px',
-                  backgroundColor: difference === 0 ? 'rgba(34, 197, 94, 0.15)' :
+                  backgroundColor: PC.equals(difference, 0) ? 'rgba(34, 197, 94, 0.15)' :
                                 difference > 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                   borderRadius: '12px',
                   textAlign: 'center',
                 }}>
                   <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
-                    الفرق (الفعلي - المتوقع: {expectedCash.toFixed(3)})
+                    {language === 'ar' ? `الفرق (الفعلي - المتوقع: ${PC.format(expectedCash)})` : `Difference (Actual - Expected: ${PC.format(expectedCash)})`}
                   </p>
                   <p style={{
                     fontSize: '28px',
                     fontWeight: 700,
-                    color: difference === 0 ? '#22c55e' :
+                    color: PC.equals(difference, 0) ? '#22c55e' :
                            difference > 0 ? '#3b82f6' : '#ef4444',
                     margin: 0,
                   }}>
-                    {difference > 0 ? '+' : ''}{difference.toFixed(3)} ر.ع
+                    {difference > 0 ? '+' : ''}{PC.format(difference)} {t.common.currency}
                   </p>
                 </div>
               </div>
@@ -656,12 +728,12 @@ export default function CashierDailyClosing({
                   marginBottom: '10px',
                 }}>
                   <FileText style={{ width: '16px', height: '16px' }} />
-                  ملاحظات (اختياري)
+                  {`${t.common.notes} (${t.common.optional})`}
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="أي ملاحظات إضافية عن إغلاق اليوم..."
+                  placeholder={language === 'ar' ? 'أي ملاحظات إضافية عن إغلاق اليوم...' : 'Any additional notes about closing the day...'}
                   rows={3}
                   disabled={step === 'confirm'}
                   style={{
@@ -690,10 +762,10 @@ export default function CashierDailyClosing({
                   <AlertCircle style={{ width: '20px', height: '20px', color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
                   <div>
                     <p style={{ fontSize: '13px', fontWeight: 600, color: '#ef4444', margin: 0 }}>
-                      تحذير: هذا الإجراء نهائي
+                      {language === 'ar' ? 'تحذير: هذا الإجراء نهائي' : 'Warning: This action is final'}
                     </p>
                     <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px', margin: 0 }}>
-                      بعد الإغلاق لن يمكن إضافة أو تعديل طلبات هذا اليوم
+                      {language === 'ar' ? 'بعد الإغلاق لن يمكن إضافة أو تعديل طلبات هذا اليوم' : 'After closing, orders for this day cannot be added or modified'}
                     </p>
                   </div>
                 </div>
@@ -726,7 +798,7 @@ export default function CashierDailyClosing({
                   cursor: 'pointer',
                 }}
               >
-                رجوع
+                {t.common.back}
               </button>
             )}
             <button
@@ -744,7 +816,7 @@ export default function CashierDailyClosing({
                 cursor: 'pointer',
               }}
             >
-              إلغاء
+              {t.common.cancel}
             </button>
             <button
               type="button"
@@ -769,16 +841,16 @@ export default function CashierDailyClosing({
               }}
             >
               {loading ? (
-                'جاري الحفظ...'
+                t.common.loading
               ) : step === 'input' ? (
                 <>
                   <Calculator style={{ width: '18px', height: '18px' }} />
-                  مراجعة وتأكيد
+                  {t.reports.reviewAndConfirm}
                 </>
               ) : (
                 <>
                   <Lock style={{ width: '18px', height: '18px' }} />
-                  تأكيد وإغلاق اليوم
+                  {t.reports.confirmAndClose}
                 </>
               )}
             </button>

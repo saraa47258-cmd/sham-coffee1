@@ -257,7 +257,7 @@
         // Real-time Firebase listeners
         function initFirebaseListeners() {
             // Listen to orders in real-time
-            firebase.database().ref(ORDERS_PATH).orderByChild('createdAt').limitToLast(20).on('value', (snapshot) => {
+            firebase.database().ref(ORDERS_PATH).orderByChild('createdAt').on('value', (snapshot) => {
                 const ordersData = snapshot.val() || {};
                 orders = Object.keys(ordersData)
                     .map(key => ({ id: key, ...ordersData[key] }))
@@ -457,7 +457,7 @@
             const tbody = document.getElementById('recent-orders');
             if (!tbody) return;
             
-            const allOrders = orders.slice(0, 10); // Last 10 orders
+            const allOrders = orders; // عرض جميع الطلبات
             
             if (allOrders.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">لا توجد طلبات حالياً</td></tr>';

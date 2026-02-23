@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Product, Category } from '@/lib/firebase/database';
 import { Search, Package } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { getLocalizedName, getLocalizedCategoryName } from '@/lib/utils/localized';
 
 interface ProductGridProps {
   products: Product[];
@@ -13,6 +15,7 @@ interface ProductGridProps {
 type ScreenSize = 'mobile' | 'tablet' | 'desktop';
 
 export default function ProductGrid({ products, categories, onProductClick }: ProductGridProps) {
+  const { language, t } = useTranslation();
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [screenSize, setScreenSize] = useState<ScreenSize>('desktop');
@@ -74,7 +77,7 @@ export default function ProductGrid({ products, categories, onProductClick }: Pr
         }
       }
       
-      return `من ${minPrice.toFixed(3)}`;
+      return `${language === 'ar' ? 'من' : 'from'} ${minPrice.toFixed(3)}`;
     }
     return `${(product.price || product.basePrice || 0).toFixed(3)}`;
   };
@@ -114,7 +117,7 @@ export default function ProductGrid({ products, categories, onProductClick }: Pr
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="ابحث عن منتج..."
+            placeholder={language === 'ar' ? 'ابحث عن منتج...' : 'Search product...'}
             style={{
               flex: 1,
               border: 'none',
@@ -137,7 +140,7 @@ export default function ProductGrid({ products, categories, onProductClick }: Pr
                 cursor: 'pointer',
               }}
             >
-              مسح
+              {language === 'ar' ? 'مسح' : 'Clear'}
             </button>
           )}
         </div>
@@ -190,7 +193,7 @@ export default function ProductGrid({ products, categories, onProductClick }: Pr
               }}
             >
               {category.icon || category.emoji}
-              {category.name}
+              {getLocalizedName(category, language)}
             </button>
           ))}
         </div>
@@ -213,10 +216,10 @@ export default function ProductGrid({ products, categories, onProductClick }: Pr
           }}>
             <Package style={{ width: isMobile ? '40px' : '48px', height: isMobile ? '40px' : '48px', color: '#cbd5e1', marginBottom: '16px' }} />
             <p style={{ fontSize: isMobile ? '14px' : '16px', color: '#64748b', marginBottom: '4px' }}>
-              لا توجد منتجات
+              {language === 'ar' ? 'لا توجد منتجات' : 'No products'}
             </p>
             <p style={{ fontSize: isMobile ? '12px' : '14px', color: '#94a3b8' }}>
-              {searchTerm ? 'جرب كلمة بحث مختلفة' : 'اختر تصنيف آخر'}
+              {searchTerm ? (language === 'ar' ? 'جرب كلمة بحث مختلفة' : 'Try a different search') : (language === 'ar' ? 'اختر تصنيف آخر' : 'Choose another category')}
             </p>
           </div>
         ) : (
@@ -291,7 +294,7 @@ export default function ProductGrid({ products, categories, onProductClick }: Pr
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
                 }}>
-                  {product.name}
+                  {getLocalizedName(product, language)}
                 </p>
 
                 {/* Price */}
@@ -323,7 +326,7 @@ export default function ProductGrid({ products, categories, onProductClick }: Pr
                     color: '#f59e0b',
                     fontWeight: 500,
                   }}>
-                    متعدد الخيارات
+                    {language === 'ar' ? 'متعدد الخيارات' : 'Multiple options'}
                   </span>
                 )}
               </button>

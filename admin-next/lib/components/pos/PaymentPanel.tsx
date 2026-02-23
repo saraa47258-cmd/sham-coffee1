@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Table, Room } from '@/lib/firebase/database';
 import { CartItem, POSOrder, calculateTotals } from '@/lib/pos';
+import * as PC from '@/lib/utils/precision';
 import { 
   CreditCard, 
   Banknote, 
@@ -17,6 +18,7 @@ import {
   Check,
   UserCircle2
 } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
 
 interface PaymentPanelProps {
   items: CartItem[];
@@ -42,6 +44,7 @@ export default function PaymentPanel({
   initialRoomId,
   initialOrderType = 'takeaway',
 }: PaymentPanelProps) {
+  const { t, language } = useTranslation();
   const [orderType, setOrderType] = useState<'table' | 'room' | 'takeaway'>(
     initialRoomId ? 'room' : initialOrderType
   );
@@ -95,7 +98,7 @@ export default function PaymentPanel({
     return {
       ...itemsTotals,
       roomPrice,
-      total: itemsTotals.total + roomPrice,
+      total: PC.add(itemsTotals.total, roomPrice),
     };
   }, [items, discountPercent, roomPrice]);
 
@@ -147,7 +150,7 @@ export default function PaymentPanel({
   }, [items.length, initialRoomId]);
 
   const change = paymentMethod === 'cash' && parseFloat(receivedAmount) > totals.total
-    ? parseFloat(receivedAmount) - totals.total
+    ? PC.subtract(parseFloat(receivedAmount), totals.total)
     : 0;
 
   // Check if gender is required for room
@@ -219,7 +222,7 @@ export default function PaymentPanel({
           gap: '8px',
         }}>
           <Receipt style={{ width: isMobile ? '18px' : '20px', height: isMobile ? '18px' : '20px', color: '#6366f1' }} />
-          ملخص الطلب
+          {language === 'ar' ? 'ملخص الطلب' : 'Order Summary'}
         </h2>
       </div>
 
@@ -238,13 +241,13 @@ export default function PaymentPanel({
             color: '#64748b',
             marginBottom: isMobile ? '8px' : '10px',
           }}>
-            نوع الطلب
+            {language === 'ar' ? 'نوع الطلب' : 'Order Type'}
           </label>
           <div style={{ display: 'flex', gap: isMobile ? '6px' : '8px' }}>
             {[
-              { value: 'takeaway', label: 'استلام', icon: ShoppingBag },
-              { value: 'table', label: 'طاولة', icon: Users },
-              { value: 'room', label: 'غرفة', icon: DoorOpen },
+              { value: 'takeaway', label: t.cashier.takeaway, icon: ShoppingBag },
+              { value: 'table', label: t.cashier.table, icon: Users },
+              { value: 'room', label: t.cashier.room, icon: DoorOpen },
             ].map((type) => {
               const Icon = type.icon;
               return (
@@ -297,11 +300,11 @@ export default function PaymentPanel({
               color: '#64748b',
               marginBottom: '10px',
             }}>
-              اختر الطاولة
+              {t.cashier.selectTable}
             </label>
             {tables.length === 0 ? (
               <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', padding: '12px' }}>
-                لا توجد طاولات متاحة
+                {language === 'ar' ? 'لا توجد طاولات متاحة' : 'No tables available'}
               </p>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -350,11 +353,11 @@ export default function PaymentPanel({
               color: '#64748b',
               marginBottom: '10px',
             }}>
-              اختر الغرفة
+              {t.cashier.selectRoom}
             </label>
             {rooms.length === 0 ? (
               <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', padding: '12px' }}>
-                لا توجد غرف متاحة
+                {language === 'ar' ? 'لا توجد غرف متاحة' : 'No rooms available'}
               </p>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -385,7 +388,7 @@ export default function PaymentPanel({
                       fontWeight: 600,
                       color: selectedRoom?.id === room.id ? '#92400e' : '#475569',
                     }}>
-                      {room.name || `غرفة ${room.roomNumber}`}
+                      {room.name || `${t.cashier.room} ${room.roomNumber}`}
                     </span>
                   </button>
                 ))}
@@ -405,7 +408,7 @@ export default function PaymentPanel({
                   marginBottom: '10px',
                 }}>
                   <UserCircle2 style={{ width: '14px', height: '14px' }} />
-                  نوع العميل (مطلوب)
+                  {language === 'ar' ? 'نوع العميل (مطلوب)' : 'Customer Type (Required)'}
                 </label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
@@ -433,14 +436,14 @@ export default function PaymentPanel({
                       fontWeight: 600,
                       color: roomGender === 'male' ? '#1d4ed8' : '#475569',
                     }}>
-                      ولد
+                      {t.rooms.male}
                     </span>
                     <span style={{
                       fontSize: '12px',
                       fontWeight: 700,
                       color: roomGender === 'male' ? '#1d4ed8' : '#ef4444',
                     }}>
-                      {(selectedRoom.malePrice || 0).toFixed(3)} ر.ع
+                      {(selectedRoom.malePrice || 0).toFixed(3)} {t.common.currency}
                     </span>
                   </button>
                   <button
@@ -468,14 +471,14 @@ export default function PaymentPanel({
                       fontWeight: 600,
                       color: roomGender === 'female' ? '#be185d' : '#475569',
                     }}>
-                      بنت
+                      {t.rooms.female}
                     </span>
                     <span style={{
                       fontSize: '12px',
                       fontWeight: 700,
                       color: roomGender === 'female' ? '#be185d' : '#16a34a',
                     }}>
-                      {(selectedRoom.femalePrice || 0) === 0 ? 'مجاني' : `${(selectedRoom.femalePrice || 0).toFixed(3)} ر.ع`}
+                      {(selectedRoom.femalePrice || 0) === 0 ? (language === 'ar' ? 'مجاني' : 'Free') : `${(selectedRoom.femalePrice || 0).toFixed(3)} ${t.common.currency}`}
                     </span>
                   </button>
                 </div>
@@ -494,7 +497,7 @@ export default function PaymentPanel({
                 color: '#92400e',
                 textAlign: 'center',
               }}>
-                سعر الغرفة: {(selectedRoom.hourlyRate || 0).toFixed(3)} ر.ع
+                {language === 'ar' ? `سعر الغرفة: ${(selectedRoom.hourlyRate || 0).toFixed(3)} ${t.common.currency}` : `Room Price: ${(selectedRoom.hourlyRate || 0).toFixed(3)} ${t.common.currency}`}
               </div>
             )}
 
@@ -509,7 +512,7 @@ export default function PaymentPanel({
                 color: '#16a34a',
                 textAlign: 'center',
               }}>
-                ✨ الغرفة مجانية
+                {language === 'ar' ? '✨ الغرفة مجانية' : '✨ Room is free'}
               </div>
             )}
           </div>
@@ -529,13 +532,13 @@ export default function PaymentPanel({
                 marginBottom: '8px',
               }}>
                 <User style={{ width: '14px', height: '14px' }} />
-                اسم العميل
+                {language === 'ar' ? 'اسم العميل' : 'Customer Name'}
               </label>
               <input
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="اختياري"
+                placeholder={t.common.optional}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -557,13 +560,13 @@ export default function PaymentPanel({
                 marginBottom: '8px',
               }}>
                 <Phone style={{ width: '14px', height: '14px' }} />
-                الهاتف
+                {language === 'ar' ? 'الهاتف' : 'Phone'}
               </label>
               <input
                 type="tel"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="اختياري"
+                placeholder={t.common.optional}
                 dir="ltr"
                 style={{
                   width: '100%',
@@ -591,7 +594,7 @@ export default function PaymentPanel({
             marginBottom: '8px',
           }}>
             <Percent style={{ width: '14px', height: '14px' }} />
-            خصم (%)
+            {t.cashier.discountPercent}
           </label>
           <div style={{ display: 'flex', gap: '8px' }}>
             {[0, 5, 10, 15, 20].map((percent) => (
@@ -632,9 +635,9 @@ export default function PaymentPanel({
             justifyContent: 'space-between',
             marginBottom: '10px',
           }}>
-            <span style={{ fontSize: '13px', color: '#64748b' }}>المجموع الفرعي (المنتجات)</span>
+            <span style={{ fontSize: '13px', color: '#64748b' }}>{language === 'ar' ? 'المجموع الفرعي (المنتجات)' : 'Subtotal (Products)'}</span>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
-              {totals.subtotal.toFixed(3)} ر.ع
+              {totals.subtotal.toFixed(3)} {t.common.currency}
             </span>
           </div>
           {totals.roomPrice > 0 && (
@@ -644,10 +647,10 @@ export default function PaymentPanel({
               marginBottom: '10px',
             }}>
               <span style={{ fontSize: '13px', color: '#f59e0b' }}>
-                سعر الغرفة {roomGender === 'male' ? '(ولد)' : roomGender === 'female' ? '(بنت)' : ''}
+                {language === 'ar' ? `سعر الغرفة ${roomGender === 'male' ? `(${t.rooms.male})` : roomGender === 'female' ? `(${t.rooms.female})` : ''}` : `Room Price ${roomGender === 'male' ? `(${t.rooms.male})` : roomGender === 'female' ? `(${t.rooms.female})` : ''}`}
               </span>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#f59e0b' }}>
-                +{totals.roomPrice.toFixed(3)} ر.ع
+                +{totals.roomPrice.toFixed(3)} {t.common.currency}
               </span>
             </div>
           )}
@@ -658,10 +661,10 @@ export default function PaymentPanel({
               marginBottom: '10px',
             }}>
               <span style={{ fontSize: '13px', color: '#16a34a' }}>
-                سعر الغرفة (بنت)
+                {language === 'ar' ? `سعر الغرفة (${t.rooms.female})` : `Room Price (${t.rooms.female})`}
               </span>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#16a34a' }}>
-                مجاني ✨
+                {language === 'ar' ? 'مجاني' : 'Free'} ✨
               </span>
             </div>
           )}
@@ -672,10 +675,10 @@ export default function PaymentPanel({
               marginBottom: '10px',
             }}>
               <span style={{ fontSize: '13px', color: '#dc2626' }}>
-                الخصم ({totals.discount.percent}%)
+                {language === 'ar' ? `الخصم (${totals.discount.percent}%)` : `Discount (${totals.discount.percent}%)`}
               </span>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#dc2626' }}>
-                -{totals.discount.amount.toFixed(3)} ر.ع
+                -{totals.discount.amount.toFixed(3)} {t.common.currency}
               </span>
             </div>
           )}
@@ -685,9 +688,9 @@ export default function PaymentPanel({
             paddingTop: '12px',
             borderTop: '1px solid #e2e8f0',
           }}>
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>الإجمالي</span>
+            <span style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>{t.common.total}</span>
             <span style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>
-              {totals.total.toFixed(3)} ر.ع
+              {totals.total.toFixed(3)} {t.common.currency}
             </span>
           </div>
         </div>
@@ -707,7 +710,7 @@ export default function PaymentPanel({
               color: '#92400e',
               marginBottom: '12px',
             }}>
-              طريقة الدفع
+              {t.payment.paymentMethod}
             </label>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
               <button
@@ -739,7 +742,7 @@ export default function PaymentPanel({
                   fontWeight: 600,
                   color: paymentMethod === 'cash' ? '#16a34a' : '#475569',
                 }}>
-                  نقدي
+                  {t.payment.cash}
                 </span>
               </button>
               <button
@@ -771,7 +774,7 @@ export default function PaymentPanel({
                   fontWeight: 600,
                   color: paymentMethod === 'card' ? '#4f46e5' : '#475569',
                 }}>
-                  بطاقة
+                  {t.payment.card}
                 </span>
               </button>
             </div>
@@ -785,7 +788,7 @@ export default function PaymentPanel({
                   color: '#92400e',
                   marginBottom: '8px',
                 }}>
-                  المبلغ المستلم
+                  {t.payment.receivedAmount}
                 </label>
                 <input
                   type="number"
@@ -838,7 +841,7 @@ export default function PaymentPanel({
                       cursor: 'pointer',
                     }}
                   >
-                    المبلغ الكامل
+                    {language === 'ar' ? 'المبلغ الكامل' : 'Full Amount'}
                   </button>
                 </div>
                 {change > 0 && (
@@ -848,9 +851,9 @@ export default function PaymentPanel({
                     borderRadius: '10px',
                     textAlign: 'center',
                   }}>
-                    <span style={{ fontSize: '13px', color: '#16a34a' }}>الباقي: </span>
+                    <span style={{ fontSize: '13px', color: '#16a34a' }}>{t.payment.change} </span>
                     <span style={{ fontSize: '18px', fontWeight: 700, color: '#16a34a' }}>
-                      {change.toFixed(3)} ر.ع
+                      {change.toFixed(3)} {t.common.currency}
                     </span>
                   </div>
                 )}
@@ -884,7 +887,7 @@ export default function PaymentPanel({
                 opacity: !canPlaceOrder || loading ? 0.5 : 1,
               }}
             >
-              {loading ? 'جاري الإنشاء...' : 'إنشاء طلب'}
+              {loading ? (language === 'ar' ? 'جاري الإنشاء...' : 'Creating...') : (language === 'ar' ? 'إنشاء طلب' : 'Create Order')}
             </button>
             <button
               onClick={() => setShowPayment(true)}
@@ -902,7 +905,7 @@ export default function PaymentPanel({
                 opacity: !canPlaceOrder ? 0.5 : 1,
               }}
             >
-              دفع الآن
+              {language === 'ar' ? 'دفع الآن' : 'Pay Now'}
             </button>
           </div>
         ) : (
@@ -920,7 +923,7 @@ export default function PaymentPanel({
                 cursor: 'pointer',
               }}
             >
-              رجوع
+              {t.common.back}
             </button>
             <button
               onClick={handlePayNow}
@@ -938,7 +941,7 @@ export default function PaymentPanel({
                 opacity: !canPay || loading ? 0.5 : 1,
               }}
             >
-              {loading ? 'جاري الدفع...' : 'تأكيد الدفع'}
+              {loading ? t.cashier.paying : t.payment.payAndClose}
             </button>
           </div>
         )}

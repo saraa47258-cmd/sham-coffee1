@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   getEmployees, 
   createEmployee, 
@@ -14,6 +15,7 @@ import {
   CreateEmployeeData
 } from '@/lib/employees';
 import { useAuth } from '@/lib/context/AuthContext';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
 import EmployeeModal from '@/lib/components/employees/EmployeeModal';
 import EmployeesTable from '@/lib/components/employees/EmployeesTable';
 import ResetPasswordModal from '@/lib/components/employees/ResetPasswordModal';
@@ -25,9 +27,12 @@ import {
   RefreshCw,
   Filter
 } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
 
 export default function WorkersPage() {
+  const router = useRouter();
   const { user } = useAuth();
+  const { t, language } = useTranslation();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,9 +48,16 @@ export default function WorkersPage() {
   const [showResetPassword, setShowResetPassword] = useState<Employee | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
 
+  // Check if user is admin
   useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (!currentUser || !isAdmin()) {
+      // Redirect to dashboard if not admin
+      router.push('/admin');
+      return;
+    }
     loadEmployees();
-  }, []);
+  }, [router]);
 
   const loadEmployees = async () => {
     try {
@@ -101,7 +113,7 @@ export default function WorkersPage() {
   };
 
   const handleDelete = async (employeeId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الموظف؟')) return;
+    if (!confirm(t.workers.confirmDelete)) return;
     try {
       await deleteEmployee(employeeId);
       await loadEmployees();
@@ -168,7 +180,7 @@ export default function WorkersPage() {
             animation: 'spin 1s linear infinite',
             margin: '0 auto',
           }}></div>
-          <p style={{ marginTop: '16px', fontSize: '14px', color: '#64748b' }}>جاري التحميل...</p>
+          <p style={{ marginTop: '16px', fontSize: '14px', color: '#64748b' }}>{t.common.loading}</p>
         </div>
         <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -177,7 +189,7 @@ export default function WorkersPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Topbar title="إدارة الموظفين" subtitle="إضافة وتعديل وإدارة الموظفين" />
+      <Topbar title={t.workers.title} subtitle={t.workers.subtitle} />
 
       <div style={{ padding: '24px' }}>
         {/* Stats Cards */}
@@ -188,11 +200,11 @@ export default function WorkersPage() {
           marginBottom: '24px' 
         }}>
           {[
-            { label: 'إجمالي الموظفين', value: stats.total, color: '#6366f1' },
-            { label: 'نشط', value: stats.active, color: '#22c55e' },
-            { label: 'مديرين', value: stats.admins, color: '#dc2626' },
-            { label: 'كاشير', value: stats.cashiers, color: '#f59e0b' },
-            { label: 'موظفين', value: stats.staff, color: '#3b82f6' },
+            { label: language === 'ar' ? 'إجمالي الموظفين' : 'Total Employees', value: stats.total, color: '#6366f1' },
+            { label: t.common.active, value: stats.active, color: '#22c55e' },
+            { label: t.roles.admin, value: stats.admins, color: '#dc2626' },
+            { label: t.roles.cashier, value: stats.cashiers, color: '#f59e0b' },
+            { label: t.roles.staff, value: stats.staff, color: '#3b82f6' },
           ].map((stat, i) => (
             <div key={i} style={{
               backgroundColor: '#ffffff',
@@ -233,10 +245,10 @@ export default function WorkersPage() {
             </div>
             <div>
               <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                قائمة الموظفين
+                {language === 'ar' ? 'قائمة الموظفين' : 'Employee List'}
               </h2>
               <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-                {filteredEmployees.length} موظف
+                {filteredEmployees.length} {language === 'ar' ? 'موظف' : 'employee(s)'}
               </p>
             </div>
           </div>
@@ -282,7 +294,7 @@ export default function WorkersPage() {
               }}
             >
               <Plus style={{ width: '18px', height: '18px' }} />
-              إضافة موظف
+              {t.workers.addWorker}
             </button>
           </div>
         </div>
@@ -307,7 +319,7 @@ export default function WorkersPage() {
             }} />
             <input
               type="text"
-              placeholder="بحث بالاسم أو اسم المستخدم..."
+              placeholder={t.common.search}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
@@ -336,10 +348,10 @@ export default function WorkersPage() {
               cursor: 'pointer',
             }}
           >
-            <option value="all">جميع الأدوار</option>
-            <option value="admin">مدير</option>
-            <option value="cashier">كاشير</option>
-            <option value="staff">موظف</option>
+            <option value="all">{language === 'ar' ? 'جميع الأدوار' : 'All Roles'}</option>
+            <option value="admin">{t.roles.admin}</option>
+            <option value="cashier">{t.roles.cashier}</option>
+            <option value="staff">{t.roles.staff}</option>
           </select>
 
           {/* Status Filter */}
@@ -356,9 +368,9 @@ export default function WorkersPage() {
               cursor: 'pointer',
             }}
           >
-            <option value="all">الكل</option>
-            <option value="active">نشط</option>
-            <option value="inactive">غير نشط</option>
+            <option value="all">{t.common.all}</option>
+            <option value="active">{t.common.active}</option>
+            <option value="inactive">{t.common.inactive}</option>
           </select>
         </div>
 

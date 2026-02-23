@@ -10,6 +10,7 @@ import {
   orderByChild,
   equalTo
 } from 'firebase/database';
+import { hashPassword } from './auth';
 
 // Types
 export type EmployeeRole = 'staff' | 'cashier' | 'admin';
@@ -180,7 +181,7 @@ export const createEmployee = async (
     uid: employeeId,
     fullName: data.fullName,
     username: data.username,
-    password: data.password, // In production, hash this
+    password: await hashPassword(data.password),
     role: data.role,
     isActive: true,
     phone: data.phone,
@@ -232,8 +233,22 @@ export const toggleEmployeeStatus = async (
   });
 };
 
-// Delete employee
+// Delete employee (with session cleanup)
 export const deleteEmployee = async (employeeId: string): Promise<void> => {
+  // حذف جلسات الموظف النشطة
+  try {
+    const sessionsRef = ref(database, 'sessions');
+    const sessionsSnap = await get(sessionsRef);
+    const sessions = sessionsSnap.val() || {};
+    const deletePromises: Promise<void>[] = [];
+    for (const [sessionId, session] of Object.entries(sessions) as [string, any][]) {
+      if (session.userId === employeeId) {
+        deletePromises.push(remove(ref(database, `sessions/${sessionId}`)));
+      }
+    }
+    await Promise.all(deletePromises);
+  } catch { /* التنظيف غير حرج */ }
+  
   await remove(ref(database, `${getPath('workers')}/${employeeId}`));
 };
 
@@ -242,8 +257,9 @@ export const resetEmployeePassword = async (
   employeeId: string,
   newPassword: string
 ): Promise<void> => {
+  const hashedPassword = await hashPassword(newPassword);
   await update(ref(database, `${getPath('workers')}/${employeeId}`), {
-    password: newPassword, // In production, hash this
+    password: hashedPassword,
     updatedAt: new Date().toISOString(),
   });
 };

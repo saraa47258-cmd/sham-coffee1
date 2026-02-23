@@ -10,9 +10,12 @@ import ProductModal from '@/lib/components/menu/ProductModal';
 import SearchBar from '@/lib/components/menu/SearchBar';
 import CartSidebar, { CartItem } from '@/lib/components/menu/CartSidebar';
 import { Coffee, Package, ShoppingCart, CheckCircle } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { getLocalizedName } from '@/lib/utils/localized';
 
 export default function StaffMenuPage() {
   const router = useRouter();
+  const { t, language } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
@@ -148,8 +151,8 @@ export default function StaffMenuPage() {
       const items = cart.map(item => ({
         id: item.product.id,
         name: item.variation 
-          ? `${item.product.name} - ${item.variation.name}`
-          : item.product.name,
+          ? `${getLocalizedName(item.product, language)} - ${getLocalizedName(item.variation, language)}`
+          : getLocalizedName(item.product, language),
         price: item.variation ? item.variation.price : item.product.price,
         quantity: item.quantity,
         itemTotal: item.quantity * (item.variation ? item.variation.price : item.product.price),
@@ -177,7 +180,7 @@ export default function StaffMenuPage() {
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (error) {
       console.error('Error submitting order:', error);
-      alert('حدث خطأ في إرسال الطلب');
+      alert(t.menuView.orderSubmitError);
     } finally {
       setIsSubmitting(false);
     }
@@ -208,7 +211,7 @@ export default function StaffMenuPage() {
           }}>
             <Coffee style={{ width: '28px', height: '28px', color: '#ffffff' }} />
           </div>
-          <p style={{ fontSize: '14px', color: '#64748b' }}>جاري تحميل المنيو...</p>
+          <p style={{ fontSize: '14px', color: '#64748b' }}>{t.menuView.loadingMenu}</p>
         </div>
         <style jsx>{`
           @keyframes pulse {
@@ -222,7 +225,7 @@ export default function StaffMenuPage() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f1f5f9' }}>
-      <Topbar title="منيو الموظفين" subtitle="اختر المنتجات وأرسل الطلب" />
+      <Topbar title={t.nav.staffMenu} subtitle={t.menuView.selectAndOrder} />
 
       {/* Success Toast */}
       {showSuccess && (
@@ -242,7 +245,7 @@ export default function StaffMenuPage() {
           boxShadow: '0 10px 25px rgba(22, 163, 74, 0.3)',
         }}>
           <CheckCircle style={{ width: '22px', height: '22px' }} />
-          <span style={{ fontWeight: 600 }}>تم إرسال الطلب بنجاح!</span>
+          <span style={{ fontWeight: 600 }}>{t.menuView.orderSentSuccess}</span>
         </div>
       )}
 
@@ -252,7 +255,7 @@ export default function StaffMenuPage() {
           <SearchBar
             value={search}
             onChange={setSearch}
-            placeholder="ابحث عن منتج..."
+            placeholder={t.menuView.searchPlaceholder}
           />
         </div>
 
@@ -275,7 +278,7 @@ export default function StaffMenuPage() {
           color: '#64748b',
         }}>
           <Package style={{ width: '18px', height: '18px' }} />
-          <span>{filteredProducts.length} منتج</span>
+          <span>{filteredProducts.length} {t.menuView.productCount}</span>
         </div>
 
         {/* Products Grid */}
@@ -300,10 +303,10 @@ export default function StaffMenuPage() {
               <Package style={{ width: '28px', height: '28px', color: '#94a3b8' }} />
             </div>
             <p style={{ fontSize: '16px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              لا توجد منتجات
+              {t.products.noProducts}
             </p>
             <p style={{ fontSize: '14px', color: '#94a3b8' }}>
-              جرب البحث بكلمة أخرى أو اختر تصنيف مختلف
+              {t.menuView.noProductsMessage}
             </p>
           </div>
         ) : (

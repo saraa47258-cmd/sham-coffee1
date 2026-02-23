@@ -19,6 +19,7 @@ import {
   getDailyClosings,
   getSalesTrend,
 } from '@/lib/reports';
+import * as PC from '@/lib/utils/precision';
 import ReportKPIs from '@/lib/components/reports/ReportKPIs';
 import DateRangeFilter from '@/lib/components/reports/DateRangeFilter';
 import SalesChart from '@/lib/components/reports/SalesChart';
@@ -34,9 +35,11 @@ import {
   FileDown,
 } from 'lucide-react';
 import { exportReportToPDF } from '@/lib/utils/pdfExport';
+import { useTranslation } from '@/lib/context/LanguageContext';
 
 export default function ReportsPage() {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
 
   // Filter State
   const [dateRange, setDateRange] = useState<DateRange>('month');
@@ -135,16 +138,16 @@ export default function ReportsPage() {
               cardSales: 0,
               averageOrder: 0,
             };
-            existing.totalSales += d.totalSales;
+            existing.totalSales = PC.add(existing.totalSales, d.totalSales);
             existing.totalOrders += d.totalOrders;
-            existing.cashSales += d.cashSales;
-            existing.cardSales += d.cardSales;
+            existing.cashSales = PC.add(existing.cashSales, d.cashSales);
+            existing.cardSales = PC.add(existing.cardSales, d.cardSales);
             yearlyMap.set(year, existing);
           });
           periodDataResult = Array.from(yearlyMap.entries())
             .map(([year, s]) => ({
               period: year,
-              stats: { ...s, averageOrder: s.totalOrders > 0 ? s.totalSales / s.totalOrders : 0 },
+              stats: { ...s, averageOrder: s.totalOrders > 0 ? PC.divide(s.totalSales, s.totalOrders) : 0 },
             }))
             .sort((a, b) => a.period.localeCompare(b.period));
           break;
@@ -165,7 +168,7 @@ export default function ReportsPage() {
 
     } catch (error) {
       console.error('Error loading reports:', error);
-      showToast('خطأ في تحميل التقارير', 'error');
+      showToast(t.reports.errorLoading, 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -183,7 +186,7 @@ export default function ReportsPage() {
   };
 
   const handleClosingSuccess = () => {
-    showToast('تم حفظ الإغلاق بنجاح', 'success');
+    showToast(t.reports.closingSavedSuccess, 'success');
     loadData(true);
   };
 
@@ -199,10 +202,10 @@ export default function ReportsPage() {
         dateRange: dateBounds,
         restaurantName: 'Sham Coffee',
       });
-      showToast('تم تصدير التقرير بنجاح', 'success');
+      showToast(t.reports.exportSuccess, 'success');
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      showToast('خطأ في تصدير التقرير', 'error');
+      showToast(t.reports.exportError, 'error');
     } finally {
       setExporting(false);
     }
@@ -233,10 +236,10 @@ export default function ReportsPage() {
             gap: '12px',
           }}>
             <BarChart3 style={{ width: '28px', height: '28px', color: '#6366f1' }} />
-            التقارير والتحليلات
+            {t.reports.title}
           </h1>
           <p style={{ fontSize: '14px', color: '#64748b', marginTop: '4px' }}>
-            تحليل شامل لأداء المبيعات
+            {t.reports.subtitle}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -259,7 +262,7 @@ export default function ReportsPage() {
             }}
           >
             <FileDown style={{ width: '18px', height: '18px' }} />
-            {exporting ? 'جاري التصدير...' : 'تصدير PDF'}
+            {exporting ? t.reports.exporting : t.reports.exportPDF}
           </button>
           <button
             onClick={() => setShowClosingModal(true)}
@@ -278,7 +281,7 @@ export default function ReportsPage() {
             }}
           >
             <Plus style={{ width: '18px', height: '18px' }} />
-            إغلاق يومي
+            {t.reports.dailyClosing}
           </button>
           <button
             onClick={() => loadData(true)}
@@ -304,7 +307,7 @@ export default function ReportsPage() {
                 animation: refreshing ? 'spin 1s linear infinite' : 'none',
               }}
             />
-            تحديث
+            {t.common.refresh}
           </button>
         </div>
       </div>
@@ -345,7 +348,7 @@ export default function ReportsPage() {
           color: '#0f172a',
           marginBottom: '16px',
         }}>
-          سجل الإغلاق اليومي
+          {t.reports.closingLog}
         </h2>
         <DailyClosingTable closings={closings} loading={loading} />
       </div>
@@ -388,21 +391,7 @@ export default function ReportsPage() {
         </div>
       )}
 
-      <style jsx global>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateX(-50%) translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-          }
-        }
-      `}</style>
+
     </div>
   );
 }

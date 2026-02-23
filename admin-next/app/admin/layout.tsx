@@ -4,6 +4,7 @@ import ProtectedRoute from '@/lib/components/ProtectedRoute';
 import Sidebar from '@/lib/components/Sidebar';
 import { useState, useEffect, useCallback } from 'react';
 import { Menu, X } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
 
 // Breakpoints
 const BREAKPOINTS = {
@@ -20,6 +21,7 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [screenSize, setScreenSize] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
   const [isClient, setIsClient] = useState(false);
+  const { t, isRtl } = useTranslation();
 
   const getScreenSize = useCallback((width: number) => {
     if (width < BREAKPOINTS.mobile) return 'mobile';
@@ -51,6 +53,10 @@ export default function AdminLayout({
   // Dynamic sidebar width based on screen size
   const sidebarWidth = screenSize === 'tablet' ? 260 : 280;
 
+  // Sidebar margin and button position based on language direction
+  const sidebarSide = isRtl ? 'right' : 'left';
+  const mainMargin = (isClient && isMobileOrTablet) ? '0' : `${sidebarWidth}px`;
+
   return (
     <ProtectedRoute>
       <div style={{ 
@@ -63,11 +69,11 @@ export default function AdminLayout({
         {isClient && isMobileOrTablet && (
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label={sidebarOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
+            aria-label={sidebarOpen ? t.common.close : t.nav.mainMenu}
             style={{
               position: 'fixed',
               top: '12px',
-              right: '12px',
+              [sidebarSide]: '12px',
               zIndex: 1100,
               width: screenSize === 'mobile' ? '44px' : '48px',
               height: screenSize === 'mobile' ? '44px' : '48px',
@@ -114,7 +120,10 @@ export default function AdminLayout({
 
         {/* Main Content */}
         <main style={{ 
-          marginRight: (isClient && isMobileOrTablet) ? '0' : `${sidebarWidth}px`, 
+          ...(isRtl 
+            ? { marginRight: mainMargin } 
+            : { marginLeft: mainMargin }
+          ),
           padding: screenSize === 'mobile' 
             ? '70px 12px 20px' 
             : screenSize === 'tablet'
@@ -122,7 +131,7 @@ export default function AdminLayout({
               : '20px 24px',
           minHeight: '100vh',
           width: (isClient && isMobileOrTablet) ? '100%' : `calc(100% - ${sidebarWidth}px)`,
-          transition: 'margin-right 0.3s ease, width 0.3s ease, padding 0.3s ease',
+          transition: 'margin 0.3s ease, width 0.3s ease, padding 0.3s ease',
           overflowX: 'hidden',
         }}>
           {children}

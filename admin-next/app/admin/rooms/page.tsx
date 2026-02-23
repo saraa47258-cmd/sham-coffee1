@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from '@/lib/context/LanguageContext';
 import { 
   Room, 
   Order,
@@ -31,13 +32,14 @@ import {
 
 type ScreenSize = 'mobile' | 'tablet' | 'desktop';
 
-const STATUS_CONFIG = {
-  available: { label: 'متاحة', color: '#16a34a', bg: '#dcfce7' },
-  reserved: { label: 'محجوزة', color: '#f59e0b', bg: '#fef3c7' },
-  occupied: { label: 'مشغولة', color: '#dc2626', bg: '#fee2e2' },
-};
-
 export default function RoomsPage() {
+  const { t, language } = useTranslation();
+
+  const STATUS_CONFIG = {
+    available: { label: t.rooms.statusAvailable, color: '#16a34a', bg: '#dcfce7' },
+    reserved: { label: t.tables.statusReserved, color: '#f59e0b', bg: '#fef3c7' },
+    occupied: { label: t.rooms.statusOccupied, color: '#dc2626', bg: '#fee2e2' },
+  };
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomOrders, setRoomOrders] = useState<Record<string, Order>>({});
   const [loading, setLoading] = useState(true);
@@ -150,7 +152,7 @@ export default function RoomsPage() {
 
   const handleDeleteRoom = async (room: Room) => {
     if (room.activeOrderId) {
-      alert('لا يمكن حذف غرفة لديها طلب نشط. قم بإغلاق الطلب أولاً.');
+      alert(t.rooms.cannotDeleteActive);
       return;
     }
     
@@ -160,7 +162,7 @@ export default function RoomsPage() {
 
   const handleToggleActive = async (room: Room) => {
     if (room.activeOrderId) {
-      alert('لا يمكن إلغاء تفعيل غرفة لديها طلب نشط.');
+      alert(t.rooms.cannotDeactivateActive);
       return;
     }
     await updateRoom(room.id, { isActive: !room.isActive });
@@ -194,10 +196,10 @@ export default function RoomsPage() {
       }}>
         <div>
           <h1 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            الغرف الخاصة
+            {t.rooms.title}
           </h1>
           <p style={{ fontSize: isMobile ? '12px' : '14px', color: '#64748b', marginTop: '4px' }}>
-            إدارة ومتابعة الغرف الخاصة والجلسات
+            {t.rooms.subtitle}
           </p>
         </div>
         <button
@@ -218,7 +220,7 @@ export default function RoomsPage() {
           }}
         >
           <Plus style={{ width: '18px', height: '18px' }} />
-          إضافة غرفة
+          {t.rooms.addRoom}
         </button>
       </div>
 
@@ -248,7 +250,7 @@ export default function RoomsPage() {
               <DoorOpen style={{ width: isMobile ? '18px' : '22px', height: isMobile ? '18px' : '22px', color: '#64748b' }} />
             </div>
             <div>
-              <p style={{ fontSize: isMobile ? '10px' : '12px', color: '#64748b', marginBottom: '2px' }}>إجمالي الغرف</p>
+              <p style={{ fontSize: isMobile ? '10px' : '12px', color: '#64748b', marginBottom: '2px' }}>{t.rooms.totalRooms}</p>
               <p style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{stats.total}</p>
             </div>
           </div>
@@ -272,7 +274,7 @@ export default function RoomsPage() {
               <CheckCircle style={{ width: isMobile ? '18px' : '22px', height: isMobile ? '18px' : '22px', color: '#16a34a' }} />
             </div>
             <div>
-              <p style={{ fontSize: isMobile ? '10px' : '12px', color: '#16a34a', marginBottom: '2px' }}>متاحة</p>
+              <p style={{ fontSize: isMobile ? '10px' : '12px', color: '#16a34a', marginBottom: '2px' }}>{t.rooms.statusAvailable}</p>
               <p style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 700, color: '#16a34a', margin: 0 }}>{stats.available}</p>
             </div>
           </div>
@@ -296,7 +298,7 @@ export default function RoomsPage() {
               <AlertCircle style={{ width: isMobile ? '18px' : '22px', height: isMobile ? '18px' : '22px', color: '#f59e0b' }} />
             </div>
             <div>
-              <p style={{ fontSize: isMobile ? '10px' : '12px', color: '#f59e0b', marginBottom: '2px' }}>محجوزة</p>
+              <p style={{ fontSize: isMobile ? '10px' : '12px', color: '#f59e0b', marginBottom: '2px' }}>{t.tables.statusReserved}</p>
               <p style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 700, color: '#f59e0b', margin: 0 }}>{stats.reserved}</p>
             </div>
           </div>
@@ -320,7 +322,7 @@ export default function RoomsPage() {
               <XCircle style={{ width: isMobile ? '18px' : '22px', height: isMobile ? '18px' : '22px', color: '#dc2626' }} />
             </div>
             <div>
-              <p style={{ fontSize: isMobile ? '10px' : '12px', color: '#dc2626', marginBottom: '2px' }}>مشغولة</p>
+              <p style={{ fontSize: isMobile ? '10px' : '12px', color: '#dc2626', marginBottom: '2px' }}>{t.rooms.statusOccupied}</p>
               <p style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 700, color: '#dc2626', margin: 0 }}>{stats.occupied}</p>
             </div>
           </div>
@@ -359,7 +361,7 @@ export default function RoomsPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="ابحث برقم أو اسم الغرفة..."
+                placeholder={t.rooms.searchPlaceholder}
                 style={{
                   flex: 1,
                   border: 'none',
@@ -381,10 +383,10 @@ export default function RoomsPage() {
             paddingBottom: isMobile ? '4px' : '0',
           }}>
             {[
-              { value: 'all', label: 'الكل', color: '#64748b' },
-              { value: 'available', label: 'متاحة', color: '#16a34a' },
-              { value: 'reserved', label: 'محجوزة', color: '#f59e0b' },
-              { value: 'occupied', label: 'مشغولة', color: '#dc2626' },
+              { value: 'all', label: t.common.all, color: '#64748b' },
+              { value: 'available', label: t.rooms.statusAvailable, color: '#16a34a' },
+              { value: 'reserved', label: t.tables.statusReserved, color: '#f59e0b' },
+              { value: 'occupied', label: t.rooms.statusOccupied, color: '#dc2626' },
             ].map((option) => (
               <button
                 key={option.value}
@@ -418,9 +420,9 @@ export default function RoomsPage() {
             paddingBottom: isMobile ? '4px' : '0',
           }}>
             {[
-              { value: 'all', label: 'الكل' },
-              { value: 'active', label: 'نشطة' },
-              { value: 'inactive', label: 'غير نشطة' },
+              { value: 'all', label: t.common.all },
+              { value: 'active', label: t.common.active },
+              { value: 'inactive', label: t.common.inactive },
             ].map((option) => (
               <button
                 key={option.value}
@@ -476,8 +478,8 @@ export default function RoomsPage() {
             <DoorOpen style={{ width: '48px', height: '48px', color: '#cbd5e1', marginBottom: '16px' }} />
             <p style={{ fontSize: '16px', color: '#475569', marginBottom: '8px' }}>
               {searchTerm || filterStatus !== 'all' || filterActive !== 'all' 
-                ? 'لا توجد غرف تطابق البحث' 
-                : 'لا توجد غرف'}
+                ? t.rooms.noRoomsMatch 
+                : t.rooms.noRooms}
             </p>
           </div>
         ) : isMobile || isTablet ? (
@@ -520,7 +522,7 @@ export default function RoomsPage() {
                       </div>
                       <div>
                         <p style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
-                          {room.name || `غرفة ${room.roomNumber}`}
+                          {room.name || `${t.cashier.room} ${room.roomNumber}`}
                         </p>
                         <span style={{
                           display: 'inline-flex',
@@ -548,17 +550,17 @@ export default function RoomsPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      التفاصيل
+                      {t.common.details}
                     </button>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
                     <span>
-                      {room.priceType === 'free' ? 'مجاني' : 
-                       room.hourlyRate ? `${room.hourlyRate} ر.ع/ساعة` : '-'}
+                      {room.priceType === 'free' ? (language === 'ar' ? 'مجاني' : 'Free') : 
+                       room.hourlyRate ? `${room.hourlyRate} ${t.rooms.hourlyRate}` : '-'}
                     </span>
                     {activeOrder && (
                       <span style={{ color: '#6366f1', fontWeight: 600 }}>
-                        طلب: {activeOrder.total.toFixed(2)} ر.ع
+                        {t.rooms.order}: {activeOrder.total.toFixed(2)} {t.common.currency}
                       </span>
                     )}
                   </div>
@@ -580,13 +582,13 @@ export default function RoomsPage() {
               fontWeight: 600,
               color: '#64748b',
             }}>
-              <div>الرقم</div>
-              <div>الاسم</div>
-              <div style={{ textAlign: 'center' }}>السعة</div>
-              <div style={{ textAlign: 'center' }}>الحالة</div>
-              <div style={{ textAlign: 'center' }}>الطلب الحالي</div>
-              <div style={{ textAlign: 'center' }}>المدة</div>
-              <div style={{ textAlign: 'center' }}>إجراءات</div>
+              <div>{t.rooms.number}</div>
+              <div>{t.common.name}</div>
+              <div style={{ textAlign: 'center' }}>{t.rooms.capacity}</div>
+              <div style={{ textAlign: 'center' }}>{t.common.status}</div>
+              <div style={{ textAlign: 'center' }}>{t.rooms.currentOrder}</div>
+              <div style={{ textAlign: 'center' }}>{t.rooms.duration}</div>
+              <div style={{ textAlign: 'center' }}>{t.common.actions}</div>
             </div>
 
             {/* Table Body - Desktop Only */}
@@ -633,7 +635,7 @@ export default function RoomsPage() {
                   {/* Name */}
                   <div>
                     <p style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
-                      {room.name || `غرفة ${room.roomNumber}`}
+                      {room.name || `${t.cashier.room} ${room.roomNumber}`}
                     </p>
                     {room.notes && (
                       <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0 0' }}>
@@ -645,14 +647,14 @@ export default function RoomsPage() {
                   {/* Pricing */}
                   <div style={{ textAlign: 'center' }}>
                     {room.priceType === 'free' ? (
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#22c55e' }}>مجاني</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#22c55e' }}>{language === 'ar' ? 'مجاني' : 'Free'}</span>
                     ) : room.priceType === 'gender' ? (
                       <div style={{ fontSize: '11px' }}>
-                        <div style={{ color: '#3b82f6' }}>🚹 {room.malePrice || 3} ر.ع</div>
-                        <div style={{ color: '#ec4899' }}>🚺 {room.femalePrice === 0 ? 'مجاني' : `${room.femalePrice} ر.ع`}</div>
+                        <div style={{ color: '#3b82f6' }}>🚹 {room.malePrice || 3} {t.common.currency}</div>
+                        <div style={{ color: '#ec4899' }}>🚺 {room.femalePrice === 0 ? (language === 'ar' ? 'مجاني' : 'Free') : `${room.femalePrice} ${t.common.currency}`}</div>
                       </div>
                     ) : room.hourlyRate && room.hourlyRate > 0 ? (
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#f59e0b' }}>{room.hourlyRate} ر.ع/ساعة</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#f59e0b' }}>{room.hourlyRate} {t.rooms.hourlyRate}</span>
                     ) : (
                       <span style={{ fontSize: '12px', color: '#94a3b8' }}>-</span>
                     )}
@@ -693,7 +695,7 @@ export default function RoomsPage() {
                             backgroundColor: (activeOrder as any).roomGender === 'male' ? '#dbeafe' : '#fce7f3',
                             color: (activeOrder as any).roomGender === 'male' ? '#1d4ed8' : '#be185d',
                           }}>
-                            {(activeOrder as any).roomGender === 'male' ? '👦 ولد' : '👧 بنت'}
+                            {(activeOrder as any).roomGender === 'male' ? `👦 ${t.rooms.male}` : `👧 ${t.rooms.female}`}
                           </span>
                         )}
                       </div>
@@ -731,7 +733,7 @@ export default function RoomsPage() {
                         cursor: 'pointer',
                         color: '#475569',
                       }}
-                      title="تعديل"
+                      title={t.common.edit}
                     >
                       <Edit style={{ width: '14px', height: '14px' }} />
                     </button>
@@ -745,7 +747,7 @@ export default function RoomsPage() {
                         cursor: 'pointer',
                         color: room.isActive === false ? '#16a34a' : '#f59e0b',
                       }}
-                      title={room.isActive === false ? 'تفعيل' : 'إلغاء التفعيل'}
+                      title={room.isActive === false ? t.rooms.activate : t.rooms.deactivate}
                     >
                       {room.isActive === false ? (
                         <Eye style={{ width: '14px', height: '14px' }} />
@@ -764,7 +766,7 @@ export default function RoomsPage() {
                         cursor: room.activeOrderId ? 'not-allowed' : 'pointer',
                         color: room.activeOrderId ? '#cbd5e1' : '#dc2626',
                       }}
-                      title={room.activeOrderId ? 'لا يمكن الحذف - طلب نشط' : 'حذف'}
+                      title={room.activeOrderId ? t.rooms.cannotDeleteActive : t.common.delete}
                     >
                       <Trash2 style={{ width: '14px', height: '14px' }} />
                     </button>
@@ -837,12 +839,12 @@ export default function RoomsPage() {
               <Trash2 style={{ width: '28px', height: '28px', color: '#dc2626' }} />
             </div>
             <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-              حذف الغرفة؟
+              {t.rooms.deleteRoom}
             </h3>
             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
-              هل أنت متأكد من حذف غرفة "{showDeleteConfirm.name || `غرفة ${showDeleteConfirm.roomNumber}`}"؟
+              {t.rooms.confirmDeleteRoom} "{showDeleteConfirm.name || `${t.cashier.room} ${showDeleteConfirm.roomNumber}`}"?
               <br />
-              <span style={{ color: '#dc2626' }}>هذا الإجراء لا يمكن التراجع عنه.</span>
+              <span style={{ color: '#dc2626' }}>{t.rooms.irreversible}</span>
             </p>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
@@ -859,7 +861,7 @@ export default function RoomsPage() {
                   cursor: 'pointer',
                 }}
               >
-                نعم، احذف
+                {t.rooms.yesDelete}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(null)}
@@ -875,7 +877,7 @@ export default function RoomsPage() {
                   cursor: 'pointer',
                 }}
               >
-                إلغاء
+                {t.common.cancel}
               </button>
             </div>
           </div>

@@ -1,6 +1,8 @@
 'use client';
 
 import { Category } from '@/lib/firebase/database';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { getLocalizedName } from '@/lib/utils/localized';
 
 interface CategoryTabsProps {
   categories: Category[];
@@ -9,6 +11,7 @@ interface CategoryTabsProps {
 }
 
 export default function CategoryTabs({ categories, activeCategory, onCategoryChange }: CategoryTabsProps) {
+  const { language } = useTranslation();
   return (
     <div style={{
       display: 'flex',
@@ -42,7 +45,7 @@ export default function CategoryTabs({ categories, activeCategory, onCategoryCha
         }}
       >
         <span style={{ fontSize: '16px' }}>📋</span>
-        <span>الكل</span>
+        <span>{language === 'ar' ? 'الكل' : 'All'}</span>
       </button>
 
       {categories.map((category) => (
@@ -69,7 +72,7 @@ export default function CategoryTabs({ categories, activeCategory, onCategoryCha
           }}
         >
           <span style={{ fontSize: '16px' }}>{category.icon || '📦'}</span>
-          <span>{category.name}</span>
+          <span>{getLocalizedName(category, language)}</span>
         </button>
       ))}
     </div>

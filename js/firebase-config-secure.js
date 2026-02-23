@@ -36,7 +36,7 @@ if (!firebase.apps.length) {
 }
 
 // تهيئة Firebase Authentication
-const auth = firebase.auth();
+const firebaseAuth = firebase.auth();
 
 // مرجع قاعدة البيانات
 const database = firebase.database();
@@ -51,7 +51,7 @@ let connectionListeners = [];
 
 connectedRef.on('value', (snap) => {
     isFirebaseConnected = snap.val() === true;
-    if (process.env.NODE_ENV !== 'production') {
+    if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'production') {
         console.log(isFirebaseConnected ? '🟢 متصل بـ Firebase' : '🔴 غير متصل بـ Firebase');
     }
     connectionListeners.forEach(cb => cb(isFirebaseConnected));
@@ -272,15 +272,11 @@ window.FirebaseDB = {
     isConnected: () => isFirebaseConnected,
     invalidateCache: (key) => firebaseCache.invalidate(key),
     clearCache: () => firebaseCache.data.clear(),
-    auth: auth,
+    auth: firebaseAuth,
     database: database
 };
 
-if (process.env.NODE_ENV !== 'production') {
+if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'production') {
     console.log('🔥 Firebase متصل بنجاح - قهوة الشام');
 }
-
-
-sham_coffee_worker
-
 

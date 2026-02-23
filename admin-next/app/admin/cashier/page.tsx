@@ -18,9 +18,12 @@ import {
 import ProductGrid from '@/lib/components/pos/ProductGrid';
 import CartPanel from '@/lib/components/pos/CartPanel';
 import PaymentPanel from '@/lib/components/pos/PaymentPanel';
+import * as PC from '@/lib/utils/precision';
 import VariationModal from '@/lib/components/pos/VariationModal';
 import ReceiptPrint from '@/lib/components/pos/ReceiptPrint';
 import CashierDailyClosing from '@/lib/components/pos/CashierDailyClosing';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { getLocalizedName } from '@/lib/utils/localized';
 import { 
   RefreshCw, 
   ClipboardList, 
@@ -38,6 +41,7 @@ type ScreenSize = 'mobile' | 'tablet' | 'desktop' | 'wide';
 
 export default function CashierPage() {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
   
   // Screen size state
   const [screenSize, setScreenSize] = useState<ScreenSize>('desktop');
@@ -106,7 +110,7 @@ export default function CashierPage() {
       setPendingOrders(ordersData);
     } catch (error) {
       console.error('Error loading data:', error);
-      showToast('خطأ في تحميل البيانات', 'error');
+      showToast(t.cashier.errorLoadingData, 'error');
     } finally {
       setLoading(false);
     }
@@ -131,15 +135,21 @@ export default function CashierPage() {
       // If orderId is provided with mode=add, enable add-to-order mode
       if (orderId && orderId.trim() && mode === 'add') {
         try {
-          console.log('Loading order for adding items:', orderId);
           const order = await getOrder(orderId);
           if (order && order.paymentStatus !== 'paid' && order.status !== 'completed') {
             setExistingOrder(order);
             setAddToOrderMode(true);
-            showToast(`وضع إضافة طلب للطاولة ${order.tableNumber || order.tableId?.slice(-4) || ''}`, 'success');
+            // تأكد من عدم فتح صفحة الدفع - لا نضع الطلب في selectedPendingOrder
+            setSelectedPendingOrder(null);
+            const isRoom = order.orderType === 'room' || !!order.roomId;
+            const roomLabel = isRoom
+              ? `${t.cashier.room} ${order.roomNumber || roomId || ''}`
+              : `${t.cashier.table} ${order.tableNumber || order.tableId?.slice(-4) || ''}`;
+            const prevTotal = (order.total ?? 0).toFixed(3);
+            showToast(`${t.cashier.addItems} — ${roomLabel} | ${t.cashier.previousPrice} ${prevTotal} ${t.common.currency}`, 'success');
             return;
           } else if (order) {
-            showToast('هذا الطلب مدفوع بالفعل ولا يمكن الإضافة إليه', 'error');
+            showToast(t.cashier.cannotAddToPaid, 'error');
           }
         } catch (error) {
           console.error('Error loading order for add mode:', error);
@@ -155,10 +165,10 @@ export default function CashierPage() {
           console.log('Loaded order:', order);
           if (order && order.paymentStatus !== 'paid' && order.status !== 'completed') {
             setSelectedPendingOrder(order);
-            showToast(`تم تحميل الطلب #${orderId.slice(-6).toUpperCase()}`, 'success');
+            showToast(`${t.cashier.orderNumber} #${orderId.slice(-6).toUpperCase()}`, 'success');
             return;
           } else if (order) {
-            showToast('هذا الطلب مدفوع بالفعل', 'error');
+            showToast(t.cashier.orderAlreadyPaid, 'error');
           }
         } catch (error) {
           console.error('Error loading order from URL:', error);
@@ -176,12 +186,12 @@ export default function CashierPage() {
           );
           if (roomOrder) {
             setSelectedPendingOrder(roomOrder);
-            showToast(`تم تحميل طلب الغرفة #${roomOrder.id.slice(-6).toUpperCase()}`, 'success');
+            showToast(`${t.cashier.room} #${roomOrder.id.slice(-6).toUpperCase()}`, 'success');
             return;
           }
           // لا يوجد طلب: وضع "طلب جديد للغرفة" (متاحة أو محجوزة)
           setNewOrderForRoomId(roomId);
-          showToast('ابدأ طلب جديد للغرفة — اختر الأصناف ثم اطلب أو ادفع', 'success');
+          showToast(t.cashier.startNewRoomOrder, 'success');
         } catch (error) {
           console.error('Error searching room order:', error);
         }
@@ -199,10 +209,10 @@ export default function CashierPage() {
           );
           if (tableOrder) {
             setSelectedPendingOrder(tableOrder);
-            showToast(`تم تحميل طلب الطاولة #${tableOrder.id.slice(-6).toUpperCase()}`, 'success');
+            showToast(`${t.cashier.orderNumber} #${tableOrder.id.slice(-6).toUpperCase()}`, 'success');
             return;
           } else {
-            showToast('لا يوجد طلب نشط لهذه الطاولة', 'error');
+            showToast(t.cashier.noActiveOrderForTable, 'error');
           }
         } catch (error) {
           console.error('Error searching table order:', error);
@@ -255,7 +265,7 @@ export default function CashierPage() {
       }
       if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
-        const searchInput = document.querySelector('input[placeholder*="ابحث"]') as HTMLInputElement;
+        const searchInput = document.querySelector('input[type="search"], input[placeholder*="ابحث"], input[placeholder*="Search"]') as HTMLInputElement;
         searchInput?.focus();
       }
     };
@@ -300,18 +310,18 @@ export default function CashierPage() {
     const newItem: CartItem = {
       id: cartItemId,
       productId: product.id,
-      name: product.name,
+      name: getLocalizedName(product, language),
       emoji: product.emoji,
       variationId: variation?.id,
-      variationName: variation?.name,
+      variationName: variation ? getLocalizedName(variation, language) : undefined,
       unitPrice: price,
       quantity,
       note: note || undefined,
-      lineTotal: price * quantity,
+      lineTotal: PC.multiply(price, quantity),
     };
     
     setCart(prev => [...prev, newItem]);
-    showToast(`تم إضافة ${product.name}`, 'success');
+    showToast(`${t.cashier.addedToCart} ${getLocalizedName(product, language)}`, 'success');
   };
 
   // Update cart item quantity
@@ -323,7 +333,7 @@ export default function CashierPage() {
     
     setCart(prev => prev.map(item => {
       if (item.id === itemId) {
-        return { ...item, quantity, lineTotal: item.unitPrice * quantity };
+        return { ...item, quantity, lineTotal: PC.multiply(item.unitPrice, quantity) };
       }
       return item;
     }));
@@ -348,13 +358,13 @@ export default function CashierPage() {
   const clearCart = () => {
     setCart([]);
     setShowClearConfirm(false);
-    showToast('تم مسح السلة', 'success');
+    showToast(t.cashier.cartCleared, 'success');
   };
 
   // Place order (without payment)
   const handlePlaceOrder = async (order: POSOrder) => {
     if (!user) {
-      showToast('يجب تسجيل الدخول', 'error');
+      showToast(t.cashier.mustLogin, 'error');
       return;
     }
 
@@ -377,7 +387,7 @@ export default function CashierPage() {
         });
         
         await addItemsToOrder(existingOrder.id, newItems);
-        showToast(`تم إضافة ${newItems.length} صنف للطلب #${existingOrder.id.slice(-6).toUpperCase()}`, 'success');
+        showToast(`${t.cashier.addedToCart} ${newItems.length} #${existingOrder.id.slice(-6).toUpperCase()}`, 'success');
         setCart([]);
         setAddToOrderMode(false);
         setExistingOrder(null);
@@ -386,13 +396,13 @@ export default function CashierPage() {
       } else {
         // Create new order
         const orderId = await createPOSOrder(order, user.id, user.name);
-        showToast(`تم إنشاء الطلب #${orderId.slice(-6).toUpperCase()}`, 'success');
+        showToast(`${t.cashier.newOrder} #${orderId.slice(-6).toUpperCase()}`, 'success');
         setCart([]);
         await loadData(); // Refresh tables/rooms
       }
     } catch (error) {
       console.error('Error creating/updating order:', error);
-      showToast('خطأ في الطلب', 'error');
+      showToast(t.cashier.orderError, 'error');
     } finally {
       setProcessing(false);
     }
@@ -405,7 +415,7 @@ export default function CashierPage() {
     receivedAmount: number
   ) => {
     if (!user) {
-      showToast('يجب تسجيل الدخول', 'error');
+      showToast(t.cashier.mustLogin, 'error');
       return;
     }
 
@@ -445,11 +455,11 @@ export default function CashierPage() {
       });
 
       setCart([]);
-      showToast('تم الدفع بنجاح', 'success');
+      showToast(t.cashier.paymentSuccess, 'success');
       await loadData();
     } catch (error) {
       console.error('Error processing payment:', error);
-      showToast('خطأ في معالجة الدفع', 'error');
+      showToast(t.cashier.paymentError, 'error');
     } finally {
       setProcessing(false);
     }
@@ -462,7 +472,7 @@ export default function CashierPage() {
     receivedAmount: number
   ) => {
     if (!user) {
-      showToast('يجب تسجيل الدخول', 'error');
+      showToast(t.cashier.mustLogin, 'error');
       return;
     }
 
@@ -506,11 +516,11 @@ export default function CashierPage() {
       });
 
       setSelectedPendingOrder(null);
-      showToast('تم الدفع بنجاح', 'success');
+      showToast(t.cashier.paymentSuccess, 'success');
       await loadData();
     } catch (error) {
       console.error('Error paying pending order:', error);
-      showToast('خطأ في معالجة الدفع', 'error');
+      showToast(t.cashier.paymentError, 'error');
     } finally {
       setProcessing(false);
     }
@@ -539,7 +549,7 @@ export default function CashierPage() {
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
           }} />
-          <p style={{ fontSize: '16px', color: '#64748b' }}>جاري تحميل الكاشير...</p>
+          <p style={{ fontSize: '16px', color: '#64748b' }}>{t.cashier.loadingCashier}</p>
         </div>
       </div>
     );
@@ -593,22 +603,34 @@ export default function CashierPage() {
               color: '#0f172a', 
               margin: 0 
             }}>
-              {addToOrderMode ? 'إضافة طلب للطاولة' : 'الكاشير'}
+              {addToOrderMode
+                ? (existingOrder?.orderType === 'room' || existingOrder?.roomId)
+                  ? t.cashier.addOrderToRoom
+                  : t.cashier.addOrderToTable
+                : t.cashier.title}
             </h1>
             {/* Add Mode Badge */}
             {addToOrderMode && existingOrder && (
               <span style={{
                 padding: '4px 12px',
-                backgroundColor: '#dbeafe',
-                color: '#1d4ed8',
+                backgroundColor: (existingOrder.orderType === 'room' || existingOrder.roomId) ? '#eef2ff' : '#dbeafe',
+                color: (existingOrder.orderType === 'room' || existingOrder.roomId) ? '#4f46e5' : '#1d4ed8',
                 borderRadius: '20px',
                 fontSize: '12px',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
               }}>
-                طاولة {existingOrder.tableNumber || existingOrder.tableId?.slice(-4)}
+                {(existingOrder.orderType === 'room' || existingOrder.roomId) ? (
+                  <>
+                    {t.cashier.room} {existingOrder.roomNumber || '-'}
+                    <span style={{ opacity: 0.8 }}>|</span>
+                    {t.cashier.previousPrice} {(existingOrder.total ?? 0).toFixed(3)} {t.common.currency}
+                  </>
+                ) : (
+                  <>{t.cashier.table} {existingOrder.tableNumber || existingOrder.tableId?.slice(-4)}</>
+                )}
                 <button
                   onClick={() => {
                     setAddToOrderMode(false);
@@ -619,7 +641,7 @@ export default function CashierPage() {
                     width: '18px',
                     height: '18px',
                     borderRadius: '50%',
-                    backgroundColor: '#1d4ed8',
+                    backgroundColor: (existingOrder.orderType === 'room' || existingOrder.roomId) ? '#4f46e5' : '#1d4ed8',
                     color: '#ffffff',
                     border: 'none',
                     cursor: 'pointer',
@@ -636,8 +658,10 @@ export default function CashierPage() {
           </div>
           <p style={{ fontSize: isMobileView ? '12px' : '13px', color: '#64748b', marginTop: '2px' }}>
             {addToOrderMode 
-              ? `إضافة أصناف للطلب #${existingOrder?.id.slice(-6).toUpperCase() || ''}`
-              : `نقطة البيع - ${user?.name || 'مستخدم'}`
+              ? (existingOrder?.orderType === 'room' || existingOrder?.roomId)
+                ? `${t.cashier.addItems} — ${t.cashier.room} ${existingOrder?.roomNumber || ''} | ${t.cashier.previousPrice} ${(existingOrder?.total ?? 0).toFixed(3)} ${t.common.currency}`
+                : `${t.cashier.addItems} #${existingOrder?.id.slice(-6).toUpperCase() || ''}`
+              : `${t.cashier.subtitle} - ${user?.name || t.common.user}`
             }
           </p>
         </div>
@@ -661,7 +685,7 @@ export default function CashierPage() {
               }}
             >
               <ClipboardList style={{ width: '18px', height: '18px' }} />
-              {screenSize !== 'tablet' && 'الطلبات المعلقة'}
+              {screenSize !== 'tablet' && t.cashier.pendingOrders}
               {pendingOrders.length > 0 && (
                 <span style={{
                   position: 'absolute',
@@ -703,7 +727,7 @@ export default function CashierPage() {
               }}
             >
               <Lock style={{ width: '16px', height: '16px' }} />
-              {screenSize !== 'tablet' && 'إغلاق اليوم'}
+              {screenSize !== 'tablet' && t.cashier.dailyClosing}
             </button>
           )}
           <button
@@ -723,7 +747,7 @@ export default function CashierPage() {
             }}
           >
             <RefreshCw style={{ width: isMobileView ? '16px' : '18px', height: isMobileView ? '16px' : '18px' }} />
-            تحديث
+            {t.common.refresh}
           </button>
         </div>
       </div>
@@ -761,7 +785,7 @@ export default function CashierPage() {
             }}
           >
             <ClipboardList style={{ width: '20px', height: '20px' }} />
-            المنتجات
+            {t.cashier.products}
           </button>
           <button
             onClick={() => setActivePanel('cart')}
@@ -782,7 +806,7 @@ export default function CashierPage() {
             }}
           >
             <ShoppingCart style={{ width: '20px', height: '20px' }} />
-            السلة
+            {t.cashier.cart}
             {cartItemsCount > 0 && (
               <span style={{
                 position: 'absolute',
@@ -823,7 +847,7 @@ export default function CashierPage() {
             }}
           >
             <CreditCard style={{ width: '20px', height: '20px' }} />
-            الدفع
+            {t.cashier.payment}
           </button>
           <button
             onClick={() => setShowPendingOrders(!showPendingOrders)}
@@ -844,7 +868,7 @@ export default function CashierPage() {
             }}
           >
             <Clock style={{ width: '20px', height: '20px' }} />
-            معلقة
+            {t.cashier.pending}
             {pendingOrders.length > 0 && (
               <span style={{
                 position: 'absolute',
@@ -886,7 +910,7 @@ export default function CashierPage() {
             }}
           >
             <Lock style={{ width: '20px', height: '20px' }} />
-            إغلاق
+            {t.cashier.closing}
           </button>
         </div>
       )}
@@ -926,7 +950,7 @@ export default function CashierPage() {
                 gap: '8px',
               }}>
                 <Clock style={{ width: '18px', height: '18px' }} />
-                الطلبات المعلقة ({pendingOrders.length})
+                {t.cashier.pendingOrders} ({pendingOrders.length})
               </h3>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
@@ -937,7 +961,7 @@ export default function CashierPage() {
                   fontSize: '13px',
                   padding: '24px',
                 }}>
-                  لا توجد طلبات معلقة
+                  {t.cashier.noPendingOrders}
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -983,7 +1007,7 @@ export default function CashierPage() {
                           fontWeight: 600,
                           color: '#f59e0b',
                         }}>
-                          {order.status === 'pending' ? 'معلق' : 'قيد التحضير'}
+                          {order.status === 'pending' ? t.orderStatus.pending : t.orderStatus.preparing}
                         </span>
                       </div>
                       <div style={{
@@ -992,9 +1016,9 @@ export default function CashierPage() {
                         fontSize: '12px',
                         color: '#64748b',
                       }}>
-                        <span>{order.itemsCount || order.items?.length} عناصر</span>
+                        <span>{order.itemsCount || order.items?.length} {t.cashier.itemsCount}</span>
                         <span style={{ fontWeight: 600, color: '#16a34a' }}>
-                          {order.total.toFixed(3)} ر.ع
+                          {order.total.toFixed(3)} {t.common.currency}
                         </span>
                       </div>
                       {(order.tableNumber || order.roomNumber) && (
@@ -1003,7 +1027,7 @@ export default function CashierPage() {
                           color: '#94a3b8',
                           marginTop: '6px',
                         }}>
-                          {order.tableNumber ? `طاولة ${order.tableNumber}` : `غرفة ${order.roomNumber}`}
+                          {order.tableNumber ? `${t.cashier.table} ${order.tableNumber}` : `${t.cashier.room} ${order.roomNumber}`}
                         </p>
                       )}
                     </div>
@@ -1103,10 +1127,10 @@ export default function CashierPage() {
               <AlertCircle style={{ width: '28px', height: '28px', color: '#f59e0b' }} />
             </div>
             <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-              مسح السلة؟
+              {t.cashier.clearCartConfirm}
             </h3>
             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
-              سيتم حذف جميع العناصر من السلة. هل أنت متأكد؟
+              {t.cashier.clearCartMessage}
             </p>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
@@ -1123,7 +1147,7 @@ export default function CashierPage() {
                   cursor: 'pointer',
                 }}
               >
-                نعم، امسح
+                {t.cashier.yesClear}
               </button>
               <button
                 onClick={() => setShowClearConfirm(false)}
@@ -1139,7 +1163,7 @@ export default function CashierPage() {
                   cursor: 'pointer',
                 }}
               >
-                إلغاء
+                {t.common.cancel}
               </button>
             </div>
           </div>
@@ -1161,7 +1185,7 @@ export default function CashierPage() {
         <CashierDailyClosing
           onClose={() => setShowDailyClosing(false)}
           onSuccess={() => {
-            showToast('تم إغلاق اليوم بنجاح', 'success');
+            showToast(t.cashier.dailyClosingSuccess, 'success');
             loadData();
           }}
           userId={user.id}
@@ -1228,6 +1252,7 @@ function PendingOrderModal({
   onPay: (order: Order, method: 'cash' | 'card', amount: number) => void;
   processing: boolean;
 }) {
+  const { t } = useTranslation();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [receivedAmount, setReceivedAmount] = useState('');
 
@@ -1273,12 +1298,12 @@ function PendingOrderModal({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                دفع الطلب #{order.id.slice(-6).toUpperCase()}
+                {t.cashier.payOrder} #{order.id.slice(-6).toUpperCase()}
               </h3>
               <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-                {order.source === 'staff-menu' ? 'طلب من منيو الموظفين' : 'طلب من الكاشير'}
-                {order.tableNumber && ` • طاولة ${order.tableNumber}`}
-                {order.roomNumber && ` • غرفة ${order.roomNumber}`}
+                {order.source === 'staff-menu' ? t.cashier.fromStaffMenu : t.cashier.fromCashier}
+                {order.tableNumber && ` • ${t.cashier.table} ${order.tableNumber}`}
+                {order.roomNumber && ` • ${t.cashier.room} ${order.roomNumber}`}
               </p>
             </div>
             <button
@@ -1306,7 +1331,7 @@ function PendingOrderModal({
           {/* Order Items */}
           <div style={{ marginBottom: '20px' }}>
             <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#94a3b8', marginBottom: '12px' }}>
-              العناصر ({order.items?.length || 0})
+              {t.cashier.items} ({order.items?.length || 0})
             </h4>
             <div style={{
               backgroundColor: '#f8fafc',
@@ -1330,11 +1355,11 @@ function PendingOrderModal({
                       {item.name}
                     </span>
                     <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>
-                      {item.quantity} × {(item.price || 0).toFixed(3)} ر.ع
+                      {item.quantity} × {(item.price || 0).toFixed(3)} {t.common.currency}
                     </p>
                   </div>
                   <span style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
-                    {(item.itemTotal || item.price * item.quantity).toFixed(3)} ر.ع
+                    {(item.itemTotal || item.price * item.quantity).toFixed(3)} {t.common.currency}
                   </span>
                 </div>
               ))}
@@ -1345,9 +1370,9 @@ function PendingOrderModal({
                 justifyContent: 'space-between',
                 alignItems: 'center',
               }}>
-                <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>الإجمالي</span>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{t.common.total}</span>
                 <span style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>
-                  {order.total.toFixed(3)} ر.ع
+                  {order.total.toFixed(3)} {t.common.currency}
                 </span>
               </div>
             </div>
@@ -1356,7 +1381,7 @@ function PendingOrderModal({
           {/* Payment Method */}
           <div style={{ marginBottom: '20px' }}>
             <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#94a3b8', marginBottom: '10px' }}>
-              طريقة الدفع
+              {t.payment.paymentMethod}
             </h4>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
@@ -1377,7 +1402,7 @@ function PendingOrderModal({
                   gap: '8px',
                 }}
               >
-                💵 نقدي
+                💵 {t.payment.cash}
               </button>
               <button
                 onClick={() => setPaymentMethod('card')}
@@ -1397,7 +1422,7 @@ function PendingOrderModal({
                   gap: '8px',
                 }}
               >
-                💳 بطاقة
+                💳 {t.payment.card}
               </button>
             </div>
           </div>
@@ -1406,13 +1431,13 @@ function PendingOrderModal({
           {paymentMethod === 'cash' && (
             <div>
               <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#94a3b8', marginBottom: '10px' }}>
-                المبلغ المستلم
+                {t.payment.receivedAmount}
               </h4>
               <input
                 type="number"
                 value={receivedAmount}
                 onChange={(e) => setReceivedAmount(e.target.value)}
-                placeholder={`الحد الأدنى: ${order.total.toFixed(3)} ر.ع`}
+                placeholder={`${t.cashier.minAmount}: ${order.total.toFixed(3)} ${t.common.currency}`}
                 style={{
                   width: '100%',
                   padding: '14px 16px',
@@ -1441,7 +1466,7 @@ function PendingOrderModal({
                       cursor: 'pointer',
                     }}
                   >
-                    {amount} ر.ع
+                    {amount} {t.common.currency}
                   </button>
                 ))}
                 <button
@@ -1457,7 +1482,7 @@ function PendingOrderModal({
                     cursor: 'pointer',
                   }}
                 >
-                  المبلغ الكامل
+                  {t.cashier.fullAmount}
                 </button>
               </div>
               
@@ -1471,9 +1496,9 @@ function PendingOrderModal({
                   justifyContent: 'space-between',
                   alignItems: 'center',
                 }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#92400e' }}>الباقي</span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#92400e' }}>{t.payment.change}</span>
                   <span style={{ fontSize: '18px', fontWeight: 700, color: '#f59e0b' }}>
-                    {change.toFixed(3)} ر.ع
+                    {change.toFixed(3)} {t.common.currency}
                   </span>
                 </div>
               )}
@@ -1504,7 +1529,7 @@ function PendingOrderModal({
               cursor: canPay && !processing ? 'pointer' : 'not-allowed',
             }}
           >
-            {processing ? 'جاري الدفع...' : `دفع ${order.total.toFixed(3)} ر.ع`}
+            {processing ? t.cashier.paying : `${t.payment.pay} ${order.total.toFixed(3)} ${t.common.currency}`}
           </button>
         </div>
       </div>

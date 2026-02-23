@@ -4,6 +4,9 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { ROLE_CONFIG, EmployeeRole } from '@/lib/employees';
+import { hasModuleAccess } from '@/lib/auth';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import LanguageSwitcher from './LanguageSwitcher';
 import { 
   Coffee, 
   Package, 
@@ -18,6 +21,7 @@ import {
   LogOut,
   X,
   ChevronLeft,
+  ChevronRight,
   Shield
 } from 'lucide-react';
 
@@ -32,38 +36,78 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { t, isRtl } = useTranslation();
   const [isNavigating, setIsNavigating] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   
-  // Helper function to check if user has permission
-  const hasPermission = (permission: string): boolean => {
+  // Helper function to check if user has permission (using detailed permissions)
+  const hasPermission = (permission: string, adminOnly: boolean = false): boolean => {
     if (!user?.role) return false;
-    const roleConfig = ROLE_CONFIG[user.role as EmployeeRole];
-    if (!roleConfig) return false;
+    
+    // If adminOnly, only admin can access
+    if (adminOnly) {
+      return user.role === 'admin';
+    }
+    
     // Admin has all permissions
     if (user.role === 'admin') return true;
+    
+    // Dashboard is always accessible to authenticated users
+    if (permission === 'dashboard') return true;
+    
+    // Map permission strings to modules
+    const permissionToModuleMap: Record<string, 'staffMenu' | 'orders' | 'tables' | 'rooms' | 'cashier' | 'inventory' | 'reports' | 'products'> = {
+      'staff-menu': 'staffMenu',
+      'cashier': 'cashier',
+      'orders': 'orders',
+      'tables': 'tables',
+      'rooms': 'rooms',
+      'room-orders': 'rooms',
+      'products': 'products',
+      'menu': 'products',
+      'inventory': 'inventory',
+      'reports': 'reports',
+      'workers': 'staffMenu', // Workers management requires staffMenu (but adminOnly for visibility)
+    };
+    
+    const module = permissionToModuleMap[permission];
+    if (module) {
+      // Check detailed permissions directly from user object
+      if (user.detailedPermissions && user.detailedPermissions.modules) {
+        // Return true only if the module is explicitly enabled
+        const hasAccess = user.detailedPermissions.modules[module] === true;
+        return hasAccess;
+      }
+      // If no detailed permissions, deny access (secure by default)
+      // Only allow if it's a legacy role with default permissions
+      return hasModuleAccess(module);
+    }
+    
+    // Fallback to role-based check for unknown permissions
+    const roleConfig = ROLE_CONFIG[user.role as EmployeeRole];
+    if (!roleConfig) return false;
     return roleConfig.permissions.includes(permission);
   };
   
-  // قائمة الروابط مع الصلاحيات المطلوبة
+  // Menu items with required permissions
   const allMenuItems = [
-    { path: '/admin', icon: Home, label: 'لوحة التحكم', permission: 'dashboard', exact: true },
-    { path: '/admin/staff-menu', icon: UtensilsCrossed, label: 'منيو الموظفين', permission: 'staff-menu' },
-    { path: '/admin/cashier', icon: ShoppingCart, label: 'الكاشير', permission: 'cashier' },
-    { path: '/admin/orders', icon: Receipt, label: 'الطلبات', permission: 'orders' },
-    { path: '/admin/tables', icon: DoorOpen, label: 'الطاولات', permission: 'tables' },
-    { path: '/admin/rooms', icon: DoorOpen, label: 'الغرف', permission: 'rooms' },
-    { path: '/admin/room-orders', icon: Receipt, label: 'طلبات الغرف', permission: 'room-orders' },
-    { path: '/admin/products', icon: Package, label: 'المنتجات', permission: 'products' },
-    { path: '/admin/menu', icon: Coffee, label: 'المنيو', permission: 'menu' },
-    { path: '/admin/inventory', icon: Warehouse, label: 'المخزن', permission: 'inventory' },
-    { path: '/admin/workers', icon: Users, label: 'الموظفين', permission: 'workers' },
-    { path: '/admin/permissions', icon: Shield, label: 'الصلاحيات', permission: 'workers' },
-    { path: '/admin/reports', icon: BarChart3, label: 'التقارير', permission: 'reports' },
+    { path: '/admin', icon: Home, label: t.nav.dashboard, permission: 'dashboard', exact: true, adminOnly: false },
+    { path: '/admin/staff-menu', icon: UtensilsCrossed, label: t.nav.staffMenu, permission: 'staff-menu', adminOnly: false },
+    { path: '/admin/cashier', icon: ShoppingCart, label: t.nav.cashier, permission: 'cashier', adminOnly: false },
+    { path: '/admin/orders', icon: Receipt, label: t.nav.orders, permission: 'orders', adminOnly: false },
+    { path: '/admin/tables', icon: DoorOpen, label: t.nav.tables, permission: 'tables', adminOnly: false },
+    { path: '/admin/rooms', icon: DoorOpen, label: t.nav.rooms, permission: 'rooms', adminOnly: false },
+    { path: '/admin/room-orders', icon: Receipt, label: t.nav.roomOrders, permission: 'room-orders', adminOnly: false },
+    { path: '/admin/products', icon: Package, label: t.nav.products, permission: 'products', adminOnly: false },
+    { path: '/admin/menu', icon: Coffee, label: t.nav.menu, permission: 'menu', adminOnly: false },
+    { path: '/admin/inventory', icon: Warehouse, label: t.nav.inventory, permission: 'inventory', adminOnly: false },
+    { path: '/admin/workers', icon: Users, label: t.nav.workers, permission: 'workers', adminOnly: true },
+    { path: '/admin/permissions', icon: Shield, label: t.nav.permissions, permission: 'permissions', adminOnly: true },
+    { path: '/admin/reports', icon: BarChart3, label: t.nav.reports, permission: 'reports', adminOnly: false },
   ];
 
   // فلترة الروابط حسب صلاحيات المستخدم
-  const menuItems = allMenuItems.filter(item => hasPermission(item.permission));
+  const menuItems = allMenuItems.filter(item => hasPermission(item.permission, item.adminOnly));
 
   const handleNavigation = useCallback((path: string) => {
     if (isNavigating) return;
@@ -76,7 +120,7 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
     
     setIsNavigating(true);
     
-    // إغلاق القائمة في الموبايل
+    // Close sidebar on mobile
     if (isMobile && onClose) {
       onClose();
     }
@@ -102,32 +146,36 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
     return currentPath === path || currentPath.startsWith(path + '/');
   };
 
-  // لا تظهر الـ Sidebar إذا كانت مغلقة
+  // Don't render sidebar if closed
   if (!isOpen) return null;
 
   // Get role badge config
   const getRoleBadge = () => {
-    if (user?.role === 'admin') return { emoji: '👑', text: 'مدير النظام', bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' };
-    if (user?.role === 'cashier') return { emoji: '💰', text: 'كاشير', bg: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' };
-    return { emoji: '👤', text: 'موظف', bg: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' };
+    if (user?.role === 'admin') return { emoji: '👑', text: t.roles.systemAdmin, bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' };
+    if (user?.role === 'cashier') return { emoji: '💰', text: t.roles.cashier, bg: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' };
+    return { emoji: '👤', text: t.roles.staff, bg: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' };
   };
 
   const roleBadge = getRoleBadge();
+  const sidebarSide = isRtl ? 'right' : 'left';
+  const textAlign = isRtl ? 'right' as const : 'left' as const;
+  const ArrowIcon = isRtl ? ChevronLeft : ChevronRight;
 
   return (
     <div style={{
       position: 'fixed',
-      right: 0,
+      [sidebarSide]: 0,
       top: 0,
       width: `${width}px`,
       height: '100vh',
       background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
-      borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+      borderLeft: isRtl ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
+      borderRight: isRtl ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
       display: 'flex',
       flexDirection: 'column',
       zIndex: 1000,
-      boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.15)',
-      transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(100%)') : 'translateX(0)',
+      boxShadow: isRtl ? '-4px 0 24px rgba(0, 0, 0, 0.15)' : '4px 0 24px rgba(0, 0, 0, 0.15)',
+      transform: isMobile ? (isOpen ? 'translateX(0)' : (isRtl ? 'translateX(100%)' : 'translateX(-100%)')) : 'translateX(0)',
       transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     }}>
       {/* Header Section */}
@@ -143,7 +191,7 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
             style={{
               position: 'absolute',
               top: '20px',
-              left: '16px',
+              ...(isRtl ? { left: '16px' } : { right: '16px' }),
               width: '36px',
               height: '36px',
               borderRadius: '10px',
@@ -192,7 +240,7 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
               color: '#ffffff',
               letterSpacing: '0.3px',
             }}>
-              قهوة الشام
+              {t.common.appName}
             </div>
             <div style={{ 
               fontSize: '12px', 
@@ -202,7 +250,7 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
               overflow: 'hidden',
               textOverflow: 'ellipsis',
             }}>
-              {user?.name || 'نظام إدارة نقاط البيع'}
+              {user?.name || t.nav.posSystem}
             </div>
           </div>
         </div>
@@ -249,7 +297,7 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
           letterSpacing: '0.5px',
           padding: '0 12px 12px',
         }}>
-          القائمة الرئيسية
+          {t.nav.mainMenu}
         </div>
         
         {menuItems.map((item) => {
@@ -283,7 +331,7 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
                 fontSize: '14px',
                 fontWeight: active ? 600 : 500,
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                textAlign: 'right',
+                textAlign: textAlign,
                 opacity: isNavigating ? 0.7 : 1,
                 position: 'relative',
                 overflow: 'hidden',
@@ -293,13 +341,13 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
               {active && (
                 <div style={{
                   position: 'absolute',
-                  right: 0,
+                  [sidebarSide === 'right' ? 'right' : 'left']: 0,
                   top: '50%',
                   transform: 'translateY(-50%)',
                   width: '4px',
                   height: '28px',
                   background: 'linear-gradient(180deg, #f59e0b 0%, #ea580c 100%)',
-                  borderRadius: '0 4px 4px 0',
+                  borderRadius: isRtl ? '0 4px 4px 0' : '4px 0 0 4px',
                   boxShadow: '0 0 12px rgba(245, 158, 11, 0.5)',
                 }} />
               )}
@@ -331,7 +379,7 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
               {/* Label */}
               <span style={{ 
                 flex: 1,
-                textAlign: 'right',
+                textAlign: textAlign,
                 letterSpacing: '0.2px',
               }}>
                 {item.label}
@@ -339,7 +387,7 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
               
               {/* Arrow for active/hover */}
               {(active || isHovered) && (
-                <ChevronLeft style={{ 
+                <ArrowIcon style={{ 
                   width: '16px', 
                   height: '16px',
                   color: active ? '#f59e0b' : '#64748b',
@@ -352,13 +400,20 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
         })}
       </nav>
 
-      {/* Logout Section */}
+      {/* Language Switcher & Logout Section */}
       <div style={{
         padding: '16px 14px 20px',
         borderTop: '1px solid rgba(255, 255, 255, 0.06)',
         flexShrink: 0,
         background: 'linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.2) 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
       }}>
+        {/* Language Switcher */}
+        <LanguageSwitcher variant="sidebar" />
+
+        {/* Logout Button */}
         <button
           onClick={handleLogout}
           onMouseEnter={(e) => {
@@ -387,7 +442,7 @@ export default function Sidebar({ isOpen = true, onClose, isMobile = false, widt
           }}
         >
           <LogOut style={{ width: '18px', height: '18px' }} />
-          <span>تسجيل الخروج</span>
+          <span>{t.auth.logout}</span>
         </button>
       </div>
     </div>

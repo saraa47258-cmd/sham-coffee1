@@ -13,6 +13,7 @@ import {
   equalTo,
   runTransaction
 } from 'firebase/database';
+import * as PC from './utils/precision';
 
 // Types
 export interface InventoryProduct {
@@ -132,7 +133,10 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
   const outOfStockCount = products.filter(p => p.stockQty <= 0).length;
   const lowStockCount = products.filter(p => p.stockQty > 0 && p.stockQty <= p.minStock).length;
   const totalInStock = totalProducts - outOfStockCount;
-  const totalStockValue = products.reduce((sum, p) => sum + (p.stockQty * (p.cost || p.price)), 0);
+  // حساب قيمة المخزون بدقة عالية
+  const totalStockValue = PC.sum(
+    products.map(p => PC.multiply(p.stockQty, p.cost || p.price))
+  );
 
   return {
     totalProducts,
@@ -145,7 +149,7 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
   };
 };
 
-// Add stock (IN)
+// Add stock (IN) — عملية ذرية باستخدام runTransaction
 export const addStock = async (
   productId: string,
   quantity: number,
@@ -154,31 +158,38 @@ export const addStock = async (
   note?: string,
   supplier?: string
 ): Promise<void> => {
+  if (quantity <= 0) throw new Error('الكمية يجب أن تكون أكبر من صفر');
+  
   const productRef = ref(database, `${getPath('menu')}/${productId}`);
   
-  // Use transaction for atomic update
-  const productSnapshot = await get(productRef);
-  if (!productSnapshot.exists()) {
-    throw new Error('المنتج غير موجود');
-  }
-
-  const product = productSnapshot.val();
-  const prevQty = product.stockQty ?? product.stock ?? 0;
-  const newQty = prevQty + quantity;
-
-  // Update product stock
-  await update(productRef, {
-    stockQty: newQty,
-    stock: newQty,
-    lastStockUpdate: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+  // Atomic transaction to prevent race conditions
+  let prevQty = 0;
+  let newQty = 0;
+  let productName = '';
+  
+  await runTransaction(ref(database, `${getPath('menu')}/${productId}/stockQty`), (currentQty) => {
+    prevQty = currentQty ?? 0;
+    newQty = prevQty + quantity;
+    return newQty;
   });
+  
+  // جلب اسم المنتج وتحديث الحقول الإضافية
+  const productSnapshot = await get(productRef);
+  if (productSnapshot.exists()) {
+    const product = productSnapshot.val();
+    productName = product.name || '';
+    await update(productRef, {
+      stock: newQty,
+      lastStockUpdate: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
 
   // Create stock movement record
   const movementRef = push(ref(database, getPath('stock_movements')));
   const movement: Omit<StockMovement, 'id'> = {
     productId,
-    productName: product.name,
+    productName,
     type: 'in',
     qtyChange: quantity,
     prevQty,
@@ -195,7 +206,7 @@ export const addStock = async (
   await set(movementRef, { id: movementRef.key, ...movement });
 };
 
-// Remove stock (OUT)
+// Remove stock (OUT) — عملية ذرية
 export const removeStock = async (
   productId: string,
   quantity: number,
@@ -204,30 +215,36 @@ export const removeStock = async (
   userName?: string,
   note?: string
 ): Promise<void> => {
+  if (quantity <= 0) throw new Error('الكمية يجب أن تكون أكبر من صفر');
+  
   const productRef = ref(database, `${getPath('menu')}/${productId}`);
   
-  const productSnapshot = await get(productRef);
-  if (!productSnapshot.exists()) {
-    throw new Error('المنتج غير موجود');
-  }
-
-  const product = productSnapshot.val();
-  const prevQty = product.stockQty ?? product.stock ?? 0;
-  const newQty = Math.max(0, prevQty - quantity);
-
-  // Update product stock
-  await update(productRef, {
-    stockQty: newQty,
-    stock: newQty,
-    lastStockUpdate: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+  let prevQty = 0;
+  let newQty = 0;
+  let productName = '';
+  
+  await runTransaction(ref(database, `${getPath('menu')}/${productId}/stockQty`), (currentQty) => {
+    prevQty = currentQty ?? 0;
+    newQty = Math.max(0, prevQty - quantity);
+    return newQty;
   });
+  
+  const productSnapshot = await get(productRef);
+  if (productSnapshot.exists()) {
+    const product = productSnapshot.val();
+    productName = product.name || '';
+    await update(productRef, {
+      stock: newQty,
+      lastStockUpdate: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
 
   // Create stock movement record
   const movementRef = push(ref(database, getPath('stock_movements')));
   const movement: Omit<StockMovement, 'id'> = {
     productId,
-    productName: product.name,
+    productName,
     type: 'out',
     qtyChange: -quantity,
     prevQty,
@@ -243,7 +260,7 @@ export const removeStock = async (
   await set(movementRef, { id: movementRef.key, ...movement });
 };
 
-// Adjust stock (set exact quantity)
+// Adjust stock (set exact quantity) — عملية ذرية
 export const adjustStock = async (
   productId: string,
   newQuantity: number,
@@ -252,30 +269,36 @@ export const adjustStock = async (
   userName?: string,
   note?: string
 ): Promise<void> => {
+  if (newQuantity < 0) throw new Error('الكمية لا يمكن أن تكون سالبة');
+  
   const productRef = ref(database, `${getPath('menu')}/${productId}`);
   
-  const productSnapshot = await get(productRef);
-  if (!productSnapshot.exists()) {
-    throw new Error('المنتج غير موجود');
-  }
-
-  const product = productSnapshot.val();
-  const prevQty = product.stockQty ?? product.stock ?? 0;
-  const qtyChange = newQuantity - prevQty;
-
-  // Update product stock
-  await update(productRef, {
-    stockQty: newQuantity,
-    stock: newQuantity,
-    lastStockUpdate: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+  let prevQty = 0;
+  let productName = '';
+  
+  await runTransaction(ref(database, `${getPath('menu')}/${productId}/stockQty`), (currentQty) => {
+    prevQty = currentQty ?? 0;
+    return newQuantity;
   });
+  
+  const productSnapshot = await get(productRef);
+  if (productSnapshot.exists()) {
+    const product = productSnapshot.val();
+    productName = product.name || '';
+    await update(productRef, {
+      stock: newQuantity,
+      lastStockUpdate: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  
+  const qtyChange = newQuantity - prevQty;
 
   // Create stock movement record
   const movementRef = push(ref(database, getPath('stock_movements')));
   const movement: Omit<StockMovement, 'id'> = {
     productId,
-    productName: product.name,
+    productName,
     type: 'adjust',
     qtyChange,
     prevQty,

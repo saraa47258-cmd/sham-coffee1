@@ -24,6 +24,7 @@ import {
   setTableStatus,
   setRoomStatus
 } from './firebase/database';
+import * as PC from './utils/precision';
 
 // POS Types
 export interface CartItem {
@@ -118,7 +119,8 @@ export const createPOSOrder = async (
   userName?: string
 ): Promise<string> => {
   const newOrderRef = push(ref(database, getPath('orders')));
-  const orderId = newOrderRef.key!;
+  const orderId = newOrderRef.key;
+  if (!orderId) throw new Error('فشل في توليد معرف الطلب');
   
   // Clean items - remove undefined values (Firebase doesn't accept undefined)
   const orderItems: OrderItem[] = order.items.map(item => {
@@ -194,9 +196,10 @@ export const payAndCloseOrder = async (
   
   // Create invoice - clean data to prevent undefined values
   const invoiceRef = push(ref(database, getPath('invoices')));
-  const invoiceId = invoiceRef.key!;
+  const invoiceId = invoiceRef.key;
+  if (!invoiceId) throw new Error('فشل في توليد معرف الفاتورة');
   
-  // Clean invoice items
+  // Clean invoice items (using precision calculation)
   const invoiceItems = order.items.map(item => {
     const cleanItem: any = {
       id: item.id,
@@ -204,7 +207,8 @@ export const payAndCloseOrder = async (
       name: item.name,
       unitPrice: item.price || 0,
       quantity: item.quantity,
-      lineTotal: item.itemTotal || (item.price || 0) * item.quantity,
+      // حساب بدقة عالية
+      lineTotal: item.itemTotal || PC.multiply(item.price || 0, item.quantity),
     };
     if (item.emoji) cleanItem.emoji = item.emoji;
     if (item.note) cleanItem.note = item.note;
@@ -342,26 +346,39 @@ export const cancelPOSOrder = async (orderId: string): Promise<void> => {
   }
 };
 
-// Apply discount to order
+// Apply discount to order (using precision calculation)
 export const applyDiscount = (
   subtotal: number,
   discountPercent: number
 ): { percent: number; amount: number } => {
-  const amount = (subtotal * discountPercent) / 100;
-  return { percent: discountPercent, amount };
+  // تحقق من نسبة الخصم (0-100)
+  const clampedPercent = Math.max(0, Math.min(100, discountPercent));
+  const amount = PC.percentage(subtotal, clampedPercent);
+  return { percent: clampedPercent, amount };
 };
 
-// Calculate totals
+// Calculate totals (using precision calculation)
 export const calculateTotals = (
   items: CartItem[],
   discountPercent: number = 0,
   taxPercent: number = 0
 ): { subtotal: number; discount: { percent: number; amount: number }; tax: { percent: number; amount: number }; total: number } => {
-  const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
-  const discount = applyDiscount(subtotal, discountPercent);
-  const afterDiscount = subtotal - discount.amount;
-  const taxAmount = (afterDiscount * taxPercent) / 100;
-  const total = afterDiscount + taxAmount;
+  // حساب المجموع الفرعي بدقة عالية
+  const subtotal = PC.sum(items.map(item => item.lineTotal));
+  
+  // حساب الخصم بدقة عالية (مع تحقق 0-100)
+  const clampedDiscount = Math.max(0, Math.min(100, discountPercent));
+  const discountAmount = PC.percentage(subtotal, clampedDiscount);
+  const discount = { percent: clampedDiscount, amount: discountAmount };
+  
+  // حساب المبلغ بعد الخصم
+  const afterDiscount = PC.subtract(subtotal, discountAmount);
+  
+  // حساب الضريبة بدقة عالية
+  const taxAmount = PC.percentage(afterDiscount, taxPercent);
+  
+  // حساب الإجمالي النهائي
+  const total = PC.add(afterDiscount, taxAmount);
   
   return {
     subtotal,

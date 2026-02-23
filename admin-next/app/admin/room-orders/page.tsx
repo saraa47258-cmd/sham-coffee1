@@ -13,6 +13,8 @@ import {
   DateRange 
 } from '@/lib/firebase/database';
 import OrderDetailsDrawer from '@/lib/components/orders/OrderDetailsDrawer';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { useScreenSize } from '@/lib/hooks/useScreenSize';
 import { 
   Eye, 
   ChevronLeft, 
@@ -30,32 +32,35 @@ import {
   DollarSign
 } from 'lucide-react';
 
-const STATUS_CONFIG = {
-  pending: { label: 'معلق', color: '#f59e0b', bg: '#fef3c7' },
-  processing: { label: 'قيد التنفيذ', color: '#3b82f6', bg: '#dbeafe' },
-  preparing: { label: 'قيد التحضير', color: '#f59e0b', bg: '#fef3c7' },
-  ready: { label: 'جاهز', color: '#06b6d4', bg: '#cffafe' },
-  paid: { label: 'مدفوع', color: '#10b981', bg: '#dcfce7' },
-  completed: { label: 'مكتمل', color: '#10b981', bg: '#dcfce7' },
-  cancelled: { label: 'ملغي', color: '#ef4444', bg: '#fee2e2' },
-};
-
-const PAYMENT_STATUS = {
-  pending: { label: 'غير مدفوع', color: '#f59e0b', bg: '#fef3c7' },
-  paid: { label: 'مدفوع', color: '#10b981', bg: '#dcfce7' },
-};
-
-const DATE_RANGES = [
-  { value: 'today', label: 'اليوم' },
-  { value: 'week', label: 'هذا الأسبوع' },
-  { value: 'month', label: 'هذا الشهر' },
-  { value: 'year', label: 'هذه السنة' },
-  { value: 'custom', label: 'تاريخ محدد' },
-];
-
 const PAGE_SIZE = 15;
 
 export default function RoomOrdersPage() {
+  const { t, language } = useTranslation();
+  const { isMobile, isTablet, isMobileOrTablet } = useScreenSize();
+
+  const STATUS_CONFIG = {
+    pending: { label: t.orderStatus.pending, color: '#f59e0b', bg: '#fef3c7' },
+    processing: { label: t.orderStatus.processing, color: '#3b82f6', bg: '#dbeafe' },
+    preparing: { label: t.orderStatus.preparing, color: '#f59e0b', bg: '#fef3c7' },
+    ready: { label: t.orderStatus.ready, color: '#06b6d4', bg: '#cffafe' },
+    paid: { label: t.orderStatus.paid, color: '#10b981', bg: '#dcfce7' },
+    completed: { label: t.orderStatus.completed, color: '#10b981', bg: '#dcfce7' },
+    cancelled: { label: t.orderStatus.cancelled, color: '#ef4444', bg: '#fee2e2' },
+  };
+
+  const PAYMENT_STATUS = {
+    pending: { label: t.payment.unpaid, color: '#f59e0b', bg: '#fef3c7' },
+    paid: { label: t.payment.paid, color: '#10b981', bg: '#dcfce7' },
+  };
+
+  const DATE_RANGES = [
+    { value: 'today', label: t.common.today },
+    { value: 'week', label: t.common.thisWeek },
+    { value: 'month', label: t.common.thisMonth },
+    { value: 'year', label: t.common.thisYear },
+    { value: 'custom', label: t.common.custom },
+  ];
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,14 +83,16 @@ export default function RoomOrdersPage() {
   }, []);
 
   // Load orders
-  const loadOrders = async () => {
+  const loadOrders = async (): Promise<Order[]> => {
     setLoading(true);
     try {
       const range = getDateRangeForFilter(dateRange, customStart, customEnd);
       const data = await getRoomOrdersByDateRange(range);
       setOrders(data);
+      return data;
     } catch (error) {
       console.error('Error loading room orders:', error);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -178,9 +185,17 @@ export default function RoomOrdersPage() {
     }
   };
 
+  const handleOrderUpdated = async () => {
+    const data = await loadOrders();
+    if (selectedOrder) {
+      const updated = data.find(o => o.id === selectedOrder.id);
+      if (updated) setSelectedOrder(updated);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('ar-EG', {
+    return date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {
       month: 'short',
       day: 'numeric',
     });
@@ -188,7 +203,7 @@ export default function RoomOrdersPage() {
 
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleTimeString('ar-EG', {
+    return date.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -204,21 +219,23 @@ export default function RoomOrdersPage() {
   const hasActiveFilters = filterRoom !== 'all' || filterStatus !== 'all' || filterPayment !== 'all' || searchTerm !== '';
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: isMobile ? '12px' : isTablet ? '16px' : '24px' }}>
       {/* Header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '24px',
+        marginBottom: isMobile ? '16px' : '24px',
+        flexWrap: 'wrap',
+        gap: '12px',
       }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            طلبات الغرف
+          <h1 style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+            {t.nav.roomOrders}
           </h1>
-          <p style={{ fontSize: '14px', color: '#64748b', marginTop: '4px' }}>
-            متابعة وإدارة طلبات الغرف الخاصة
-          </p>
+          {!isMobile && <p style={{ fontSize: '14px', color: '#64748b', marginTop: '4px' }}>
+            {t.orders.subtitle}
+          </p>}
         </div>
         <button
           onClick={handleRefresh}
@@ -227,11 +244,11 @@ export default function RoomOrdersPage() {
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 20px',
+            padding: isMobile ? '8px 14px' : '10px 20px',
             backgroundColor: '#f1f5f9',
             border: '1px solid #e2e8f0',
             borderRadius: '12px',
-            fontSize: '14px',
+            fontSize: isMobile ? '13px' : '14px',
             fontWeight: 600,
             color: '#475569',
             cursor: refreshing ? 'not-allowed' : 'pointer',
@@ -244,120 +261,124 @@ export default function RoomOrdersPage() {
               animation: refreshing ? 'spin 1s linear infinite' : 'none',
             }} 
           />
-          تحديث
+          {!isMobile && t.common.refresh}
         </button>
       </div>
 
       {/* Stats Cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '16px',
-        marginBottom: '24px',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+        gap: isMobile ? '10px' : '16px',
+        marginBottom: isMobile ? '16px' : '24px',
       }}>
         <div style={{
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           backgroundColor: '#ffffff',
-          borderRadius: '16px',
+          borderRadius: isMobile ? '12px' : '16px',
           border: '1px solid #e2e8f0',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
+          gap: isMobile ? '10px' : '16px',
         }}>
           <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
+            width: isMobile ? '36px' : '48px',
+            height: isMobile ? '36px' : '48px',
+            borderRadius: isMobile ? '8px' : '12px',
             backgroundColor: '#f3e8ff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0,
           }}>
-            <ShoppingCart style={{ width: '24px', height: '24px', color: '#a855f7' }} />
+            <ShoppingCart style={{ width: isMobile ? '18px' : '24px', height: isMobile ? '18px' : '24px', color: '#a855f7' }} />
           </div>
-          <div>
-            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '2px' }}>إجمالي الطلبات</p>
-            <p style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{stats.total}</p>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#64748b', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.reports.totalOrders}</p>
+            <p style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{stats.total}</p>
           </div>
         </div>
         <div style={{
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           backgroundColor: '#f0fdf4',
-          borderRadius: '16px',
+          borderRadius: isMobile ? '12px' : '16px',
           border: '1px solid #16a34a',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
+          gap: isMobile ? '10px' : '16px',
         }}>
           <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
+            width: isMobile ? '36px' : '48px',
+            height: isMobile ? '36px' : '48px',
+            borderRadius: isMobile ? '8px' : '12px',
             backgroundColor: '#dcfce7',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0,
           }}>
-            <DollarSign style={{ width: '24px', height: '24px', color: '#16a34a' }} />
+            <DollarSign style={{ width: isMobile ? '18px' : '24px', height: isMobile ? '18px' : '24px', color: '#16a34a' }} />
           </div>
-          <div>
-            <p style={{ fontSize: '12px', color: '#16a34a', marginBottom: '2px' }}>إجمالي المبيعات</p>
-            <p style={{ fontSize: '24px', fontWeight: 700, color: '#16a34a', margin: 0 }}>{stats.totalSales.toFixed(2)}</p>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#16a34a', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.reports.totalSales}</p>
+            <p style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: 700, color: '#16a34a', margin: 0 }}>{stats.totalSales.toFixed(2)}</p>
           </div>
         </div>
         <div style={{
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           backgroundColor: '#ffffff',
-          borderRadius: '16px',
+          borderRadius: isMobile ? '12px' : '16px',
           border: '1px solid #e2e8f0',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
+          gap: isMobile ? '10px' : '16px',
         }}>
           <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
+            width: isMobile ? '36px' : '48px',
+            height: isMobile ? '36px' : '48px',
+            borderRadius: isMobile ? '8px' : '12px',
             backgroundColor: '#dcfce7',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0,
           }}>
-            <CreditCard style={{ width: '24px', height: '24px', color: '#16a34a' }} />
+            <CreditCard style={{ width: isMobile ? '18px' : '24px', height: isMobile ? '18px' : '24px', color: '#16a34a' }} />
           </div>
-          <div>
-            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '2px' }}>مدفوع</p>
-            <p style={{ fontSize: '24px', fontWeight: 700, color: '#16a34a', margin: 0 }}>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#64748b', marginBottom: '2px' }}>{t.payment.paid}</p>
+            <p style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: 700, color: '#16a34a', margin: 0 }}>
               {stats.paidCount}
-              <span style={{ fontSize: '14px', color: '#f59e0b', marginRight: '8px' }}>
-                / {stats.unpaidCount} غير مدفوع
-              </span>
+              {!isMobile && <span style={{ fontSize: '14px', color: '#f59e0b', marginRight: '8px' }}>
+                / {stats.unpaidCount} {t.payment.unpaid}
+              </span>}
             </p>
           </div>
         </div>
         <div style={{
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           backgroundColor: '#fef3c7',
-          borderRadius: '16px',
+          borderRadius: isMobile ? '12px' : '16px',
           border: '1px solid #f59e0b',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
+          gap: isMobile ? '10px' : '16px',
         }}>
           <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
+            width: isMobile ? '36px' : '48px',
+            height: isMobile ? '36px' : '48px',
+            borderRadius: isMobile ? '8px' : '12px',
             backgroundColor: '#fde68a',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0,
           }}>
-            <Clock style={{ width: '24px', height: '24px', color: '#f59e0b' }} />
+            <Clock style={{ width: isMobile ? '18px' : '24px', height: isMobile ? '18px' : '24px', color: '#f59e0b' }} />
           </div>
-          <div>
-            <p style={{ fontSize: '12px', color: '#f59e0b', marginBottom: '2px' }}>معلق</p>
-            <p style={{ fontSize: '24px', fontWeight: 700, color: '#f59e0b', margin: 0 }}>{stats.pendingCount}</p>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#f59e0b', marginBottom: '2px' }}>{t.orderStatus.pending}</p>
+            <p style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: 700, color: '#f59e0b', margin: 0 }}>{stats.pendingCount}</p>
           </div>
         </div>
       </div>
@@ -365,10 +386,10 @@ export default function RoomOrdersPage() {
       {/* Filters */}
       <div style={{
         backgroundColor: '#ffffff',
-        borderRadius: '16px',
+        borderRadius: isMobile ? '12px' : '16px',
         border: '1px solid #e2e8f0',
-        padding: '20px',
-        marginBottom: '24px',
+        padding: isMobile ? '12px' : '20px',
+        marginBottom: isMobile ? '16px' : '24px',
       }}>
         {/* Date Range */}
         <div style={{
@@ -407,7 +428,7 @@ export default function RoomOrdersPage() {
           }}>
             <div style={{ flex: 1, minWidth: '150px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '6px' }}>
-                من تاريخ
+                {t.common.from}
               </label>
               <input
                 type="date"
@@ -425,7 +446,7 @@ export default function RoomOrdersPage() {
             </div>
             <div style={{ flex: 1, minWidth: '150px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '6px' }}>
-                إلى تاريخ
+                {t.common.to}
               </label>
               <input
                 type="date"
@@ -452,7 +473,7 @@ export default function RoomOrdersPage() {
           alignItems: 'flex-end',
         }}>
           {/* Search */}
-          <div style={{ flex: 2, minWidth: '200px' }}>
+          <div style={{ flex: 2, minWidth: isMobile ? '100%' : '200px' }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -468,7 +489,7 @@ export default function RoomOrdersPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="ابحث برقم الطلب أو الغرفة..."
+                placeholder={t.common.search}
                 style={{
                   flex: 1,
                   border: 'none',
@@ -496,7 +517,7 @@ export default function RoomOrdersPage() {
           </div>
 
           {/* Room Filter */}
-          <div style={{ flex: 1, minWidth: '140px' }}>
+          <div style={{ flex: 1, minWidth: isMobile ? 'calc(50% - 6px)' : '140px' }}>
             <select
               value={filterRoom}
               onChange={(e) => setFilterRoom(e.target.value)}
@@ -512,17 +533,17 @@ export default function RoomOrdersPage() {
                 cursor: 'pointer',
               }}
             >
-              <option value="all">جميع الغرف</option>
+              <option value="all">{language === 'ar' ? 'جميع الغرف' : 'All Rooms'}</option>
               {rooms.map((room) => (
                 <option key={room.id} value={room.id}>
-                  غرفة {room.roomNumber}
+                  {language === 'ar' ? 'غرفة' : 'Room'} {room.roomNumber}
                 </option>
               ))}
             </select>
           </div>
 
           {/* Status Filter */}
-          <div style={{ flex: 1, minWidth: '120px' }}>
+          <div style={{ flex: 1, minWidth: isMobile ? 'calc(50% - 6px)' : '120px' }}>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -538,17 +559,17 @@ export default function RoomOrdersPage() {
                 cursor: 'pointer',
               }}
             >
-              <option value="all">جميع الحالات</option>
-              <option value="pending">معلق</option>
-              <option value="preparing">قيد التحضير</option>
-              <option value="ready">جاهز</option>
-              <option value="completed">مكتمل</option>
-              <option value="cancelled">ملغي</option>
+              <option value="all">{t.orders.allStatuses}</option>
+              <option value="pending">{t.orderStatus.pending}</option>
+              <option value="preparing">{t.orderStatus.preparing}</option>
+              <option value="ready">{t.orderStatus.ready}</option>
+              <option value="completed">{t.orderStatus.completed}</option>
+              <option value="cancelled">{t.orderStatus.cancelled}</option>
             </select>
           </div>
 
           {/* Payment Filter */}
-          <div style={{ flex: 1, minWidth: '120px' }}>
+          <div style={{ flex: 1, minWidth: isMobile ? 'calc(50% - 6px)' : '120px' }}>
             <select
               value={filterPayment}
               onChange={(e) => setFilterPayment(e.target.value)}
@@ -564,9 +585,9 @@ export default function RoomOrdersPage() {
                 cursor: 'pointer',
               }}
             >
-              <option value="all">الكل</option>
-              <option value="paid">مدفوع</option>
-              <option value="pending">غير مدفوع</option>
+              <option value="all">{t.common.all}</option>
+              <option value="paid">{t.payment.paid}</option>
+              <option value="pending">{t.payment.unpaid}</option>
             </select>
           </div>
 
@@ -590,7 +611,7 @@ export default function RoomOrdersPage() {
               }}
             >
               <X style={{ width: '16px', height: '16px' }} />
-              مسح
+              {language === 'ar' ? 'مسح' : 'Clear'}
             </button>
           )}
         </div>
@@ -599,7 +620,7 @@ export default function RoomOrdersPage() {
       {/* Orders Table */}
       <div style={{
         backgroundColor: '#ffffff',
-        borderRadius: '16px',
+        borderRadius: isMobile ? '12px' : '16px',
         border: '1px solid #e2e8f0',
         overflow: 'hidden',
       }}>
@@ -626,18 +647,68 @@ export default function RoomOrdersPage() {
           }}>
             <DoorOpen style={{ width: '48px', height: '48px', color: '#cbd5e1', marginBottom: '16px' }} />
             <p style={{ fontSize: '16px', color: '#475569', marginBottom: '8px' }}>
-              لا توجد طلبات
+              {t.orders.noOrders}
             </p>
             <p style={{ fontSize: '14px', color: '#94a3b8' }}>
-              {hasActiveFilters ? 'جرب تغيير الفلاتر' : 'لم يتم تسجيل أي طلبات غرف في هذه الفترة'}
+              {hasActiveFilters ? (language === 'ar' ? 'جرب تغيير الفلاتر' : 'Try changing filters') : (language === 'ar' ? 'لم يتم تسجيل أي طلبات غرف في هذه الفترة' : 'No room orders recorded in this period')}
             </p>
           </div>
         ) : (
           <>
+            {isMobile ? (
+              /* Mobile Card Layout */
+              <div style={{ padding: '8px' }}>
+                {paginatedOrders.map((order) => {
+                  const statusConfig = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
+                  const isPaid = order.paymentStatus === 'paid' || order.status === 'paid';
+                  const paymentConfig = isPaid ? PAYMENT_STATUS.paid : PAYMENT_STATUS.pending;
+                  return (
+                    <div
+                      key={order.id}
+                      onClick={() => setSelectedOrder(order)}
+                      style={{
+                        padding: '14px',
+                        borderBottom: '1px solid #f1f5f9',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#a855f7', fontFamily: 'monospace' }}>
+                          #{order.id.slice(-6).toUpperCase()}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <DoorOpen style={{ width: '14px', height: '14px', color: '#f59e0b' }} />
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{order.roomNumber || '-'}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>{formatDate(order.createdAt)} {formatTime(order.createdAt)}</span>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                          {order.total.toFixed(3)} {t.common.currency}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, backgroundColor: statusConfig.bg, color: statusConfig.color }}>
+                          {statusConfig.label}
+                        </span>
+                        <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, backgroundColor: paymentConfig.bg, color: paymentConfig.color }}>
+                          {paymentConfig.label}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8', alignSelf: 'center' }}>
+                          {(order.itemsCount || order.items?.length || 0)} {t.dashboard.product}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Desktop/Tablet: Scrollable Table */
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             {/* Table Header */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '100px 100px 140px 80px 100px 100px 100px 80px',
+              gridTemplateColumns: isTablet ? '80px 80px 110px 60px 90px 90px 90px 60px' : '100px 100px 140px 80px 100px 100px 100px 80px',
               gap: '12px',
               padding: '14px 20px',
               backgroundColor: '#f8fafc',
@@ -645,15 +716,16 @@ export default function RoomOrdersPage() {
               fontSize: '12px',
               fontWeight: 600,
               color: '#64748b',
+              minWidth: isTablet ? '660px' : 'auto',
             }}>
-              <div>رقم الطلب</div>
-              <div>الغرفة</div>
-              <div>التاريخ/الوقت</div>
-              <div style={{ textAlign: 'center' }}>العناصر</div>
-              <div style={{ textAlign: 'center' }}>الإجمالي</div>
-              <div style={{ textAlign: 'center' }}>الدفع</div>
-              <div style={{ textAlign: 'center' }}>الحالة</div>
-              <div style={{ textAlign: 'center' }}>إجراءات</div>
+              <div>{language === 'ar' ? 'رقم الطلب' : 'Order #'}</div>
+              <div>{language === 'ar' ? 'الغرفة' : 'Room'}</div>
+              <div>{t.common.date}/{t.common.time}</div>
+              <div style={{ textAlign: 'center' }}>{t.orders.orderItems}</div>
+              <div style={{ textAlign: 'center' }}>{t.common.total}</div>
+              <div style={{ textAlign: 'center' }}>{language === 'ar' ? 'الدفع' : 'Payment'}</div>
+              <div style={{ textAlign: 'center' }}>{t.common.status}</div>
+              <div style={{ textAlign: 'center' }}>{t.common.actions}</div>
             </div>
 
             {/* Table Body */}
@@ -668,13 +740,14 @@ export default function RoomOrdersPage() {
                   onClick={() => setSelectedOrder(order)}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '100px 100px 140px 80px 100px 100px 100px 80px',
+                    gridTemplateColumns: isTablet ? '80px 80px 110px 60px 90px 90px 90px 60px' : '100px 100px 140px 80px 100px 100px 100px 80px',
                     gap: '12px',
                     padding: '16px 20px',
                     borderBottom: '1px solid #f1f5f9',
                     alignItems: 'center',
                     cursor: 'pointer',
                     transition: 'background-color 0.15s',
+                    minWidth: isTablet ? '660px' : 'auto',
                   }}
                   onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                   onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -726,7 +799,7 @@ export default function RoomOrdersPage() {
                       {order.total.toFixed(3)}
                     </span>
                     <span style={{ fontSize: '11px', color: '#94a3b8', marginRight: '4px' }}>
-                      ر.ع
+                      {t.common.currency}
                     </span>
                   </div>
 
@@ -782,20 +855,24 @@ export default function RoomOrdersPage() {
                 </div>
               );
             })}
+              </div>
+            )}
 
             {/* Pagination */}
             {totalPages > 1 && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px 20px',
+                justifyContent: isMobile ? 'center' : 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                padding: isMobile ? '12px' : '16px 20px',
                 borderTop: '1px solid #e2e8f0',
                 backgroundColor: '#f8fafc',
               }}>
-                <span style={{ fontSize: '13px', color: '#64748b' }}>
-                  عرض {((currentPage - 1) * PAGE_SIZE) + 1} - {Math.min(currentPage * PAGE_SIZE, filteredOrders.length)} من {filteredOrders.length}
-                </span>
+                {!isMobile && <span style={{ fontSize: '13px', color: '#64748b' }}>
+                  {language === 'ar' ? 'عرض' : 'Showing'} {((currentPage - 1) * PAGE_SIZE) + 1} - {Math.min(currentPage * PAGE_SIZE, filteredOrders.length)} {language === 'ar' ? 'من' : 'of'} {filteredOrders.length}
+                </span>}
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -879,6 +956,7 @@ export default function RoomOrdersPage() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onUpdateStatus={handleStatusUpdate}
+          onOrderUpdated={handleOrderUpdated}
         />
       )}
 

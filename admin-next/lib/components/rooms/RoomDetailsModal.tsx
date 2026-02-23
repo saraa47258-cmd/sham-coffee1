@@ -124,6 +124,12 @@ export default function RoomDetailsModal({
     router.push(`/admin/cashier?roomId=${room.id}&orderId=${activeOrder?.id || ''}`);
   };
 
+  /** إضافة طلب جديد: تحويل للكاشير مع الغرفة والسعر السابق (وضع إضافة للطلب) */
+  const handleAddOrderInCashier = () => {
+    if (!activeOrder?.id) return;
+    router.push(`/admin/cashier?roomId=${room.id}&orderId=${activeOrder.id}&mode=add`);
+  };
+
   const handleNewOrder = () => {
     router.push(`/admin/cashier?roomId=${room.id}`);
   };
@@ -438,7 +444,7 @@ export default function RoomDetailsModal({
                 borderRadius: '0 0 12px 12px',
                 overflow: 'hidden',
               }}>
-                {activeOrder.items?.slice(0, 5).map((item, index) => (
+                {activeOrder.items?.map((item, index) => (
                   <div
                     key={index}
                     style={{
@@ -463,18 +469,6 @@ export default function RoomDetailsModal({
                     </span>
                   </div>
                 ))}
-                
-                {activeOrder.items && activeOrder.items.length > 5 && (
-                  <div style={{
-                    padding: '10px 16px',
-                    backgroundColor: '#f8fafc',
-                    textAlign: 'center',
-                    fontSize: '12px',
-                    color: '#64748b',
-                  }}>
-                    و {activeOrder.items.length - 5} عناصر أخرى...
-                  </div>
-                )}
 
                 <div style={{
                   padding: '14px 16px',
@@ -487,6 +481,39 @@ export default function RoomDetailsModal({
                   <span style={{ fontSize: '18px', fontWeight: 700, color: '#16a34a' }}>
                     {activeOrder.total.toFixed(3)} ر.ع
                   </span>
+                </div>
+
+                {/* خانة إضافة طلب جديد عند كون الغرفة مشغولة */}
+                <div style={{
+                  marginTop: '12px',
+                  padding: '12px 16px',
+                  backgroundColor: '#eef2ff',
+                  borderRadius: '12px',
+                  border: '1px solid #c7d2fe',
+                }}>
+                  <button
+                    onClick={handleAddOrderInCashier}
+                    disabled={loading}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '12px 16px',
+                      backgroundColor: '#6366f1',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: '#ffffff',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      opacity: loading ? 0.7 : 1,
+                    }}
+                  >
+                    <ShoppingBag style={{ width: '18px', height: '18px' }} />
+                    إضافة طلب جديد
+                  </button>
                 </div>
               </div>
             </div>
@@ -659,28 +686,52 @@ export default function RoomDetailsModal({
                 </button>
               </>
             ) : (
-              <button
-                onClick={handleSetAvailable}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  padding: '14px',
-                  backgroundColor: '#16a34a',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: '#ffffff',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <Unlock style={{ width: '18px', height: '18px' }} />
-                إغلاق الطلب وتحرير الغرفة
-              </button>
+              <>
+                <button
+                  onClick={handleSetAvailable}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '14px',
+                    backgroundColor: '#16a34a',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#ffffff',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <Unlock style={{ width: '18px', height: '18px' }} />
+                  إغلاق الطلب وتحرير الغرفة
+                </button>
+                <button
+                  onClick={handleAddOrderInCashier}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '14px',
+                    backgroundColor: '#6366f1',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <ShoppingBag style={{ width: '18px', height: '18px' }} />
+                  إضافة طلب جديد
+                </button>
+              </>
             )}
           </div>
 

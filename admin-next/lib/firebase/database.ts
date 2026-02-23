@@ -1,5 +1,6 @@
 import { database, RESTAURANT_ID } from './config';
 import { ref, get, set, update, remove, push, query, orderByChild, limitToLast, equalTo, onValue, off, DataSnapshot } from 'firebase/database';
+import * as PC from '../utils/precision';
 
 // Types
 export interface Order {
@@ -346,7 +347,7 @@ export const listenToOrders = (callback: (orders: Order[]) => void): () => void 
     }));
     callback(orders);
   });
-  return () => off(ordersRef, 'value', unsubscribe);
+  return unsubscribe;
 };
 
 export const updateOrderStatus = async (orderId: string, status: string): Promise<void> => {
@@ -366,7 +367,8 @@ export const createOrder = async (order: Omit<Order, 'id'>): Promise<string> => 
       name: item.name,
       price: item.price || 0,
       quantity: item.quantity,
-      itemTotal: item.itemTotal || item.price * item.quantity,
+      // حساب إجمالي العنصر بدقة عالية
+      itemTotal: item.itemTotal || PC.multiply(item.price, item.quantity),
     };
     if (item.emoji) cleanItem.emoji = item.emoji;
     if (item.note) cleanItem.note = item.note;
@@ -412,7 +414,10 @@ export const createOrder = async (order: Omit<Order, 'id'>): Promise<string> => 
   }
 
   await set(newRef, orderData);
-  const orderId = newRef.key!;
+  const orderId = newRef.key;
+  if (!orderId) {
+    throw new Error('فشل في إنشاء معرف الطلب');
+  }
 
   // Automatically set table status to 'occupied' when order is created for a table
   if (foundTableId) {
@@ -578,6 +583,9 @@ export const createProduct = async (product: Omit<Product, 'id'>): Promise<strin
     }
   });
   
+  if (!newRef.key) {
+    throw new Error('فشل في إنشاء معرف المنتج');
+  }
   await set(newRef, {
     ...cleanProduct,
     category: product.categoryId || product.category,
@@ -586,7 +594,7 @@ export const createProduct = async (product: Omit<Product, 'id'>): Promise<strin
     isActive: product.isActive ?? product.active ?? true,
     createdAt: new Date().toISOString(),
   });
-  return newRef.key!;
+  return newRef.key;
 };
 
 export const updateProduct = async (productId: string, updates: Partial<Product>): Promise<void> => {
@@ -686,7 +694,8 @@ export const createCategory = async (category: Omit<Category, 'id'>): Promise<st
     ...cleanCategory,
     createdAt: new Date().toISOString(),
   });
-  return newRef.key!;
+  if (!newRef.key) throw new Error('فشل في إنشاء معرف الفئة');
+  return newRef.key;
 };
 
 export const updateCategory = async (categoryId: string, updates: Partial<Category>): Promise<void> => {
@@ -755,7 +764,8 @@ export const createWorker = async (worker: Omit<Worker, 'id'>): Promise<string> 
     ...worker,
     restaurantId: RESTAURANT_ID,
   });
-  return newRef.key!;
+  if (!newRef.key) throw new Error('فشل في إنشاء معرف الموظف');
+  return newRef.key;
 };
 
 export const updateWorker = async (workerId: string, updates: Partial<Worker>): Promise<void> => {
@@ -890,7 +900,7 @@ export const addItemsToOrder = async (orderId: string, newItems: OrderItem[]): P
       // Update quantity
       mergedItems[existingIndex].quantity += newItem.quantity;
       mergedItems[existingIndex].itemTotal = 
-        mergedItems[existingIndex].quantity * mergedItems[existingIndex].price;
+        PC.multiply(mergedItems[existingIndex].price, mergedItems[existingIndex].quantity);
     } else {
       // Add new item (clean undefined values)
       const cleanItem: OrderItem = {
@@ -898,7 +908,7 @@ export const addItemsToOrder = async (orderId: string, newItems: OrderItem[]): P
         name: newItem.name,
         price: newItem.price || 0,
         quantity: newItem.quantity,
-        itemTotal: newItem.quantity * (newItem.price || 0),
+        itemTotal: PC.multiply(newItem.price || 0, newItem.quantity),
       };
       // Only add optional fields if they have values
       if (newItem.emoji) cleanItem.emoji = newItem.emoji;
@@ -915,15 +925,16 @@ export const addItemsToOrder = async (orderId: string, newItems: OrderItem[]): P
       name: item.name,
       price: item.price || 0,
       quantity: item.quantity,
-      itemTotal: item.itemTotal || (item.quantity * (item.price || 0)),
+      // حساب بدقة عالية
+      itemTotal: PC.multiply(item.price || 0, item.quantity),
     };
     if (item.emoji) clean.emoji = item.emoji;
     if (item.note) clean.note = item.note;
     return clean;
   });
   
-  // Recalculate total
-  const newTotal = cleanedItems.reduce((sum, item) => sum + (item.itemTotal || item.quantity * item.price), 0);
+  // Recalculate total (using precision calculation)
+  const newTotal = PC.sum(cleanedItems.map(item => item.itemTotal || 0));
   const itemsCount = cleanedItems.reduce((sum, item) => sum + item.quantity, 0);
   
   await update(ref(database, `${getPath('orders')}/${orderId}`), {
@@ -932,6 +943,38 @@ export const addItemsToOrder = async (orderId: string, newItems: OrderItem[]): P
     itemsCount,
     updatedAt: new Date().toISOString(),
   });
+};
+
+/** إزالة صنف من الطلب (بالترتيب) — للأدمن */
+export const removeItemFromOrder = async (orderId: string, itemIndex: number): Promise<void> => {
+  const order = await getOrder(orderId);
+  if (!order) throw new Error('Order not found');
+  const items = order.items || [];
+  if (itemIndex < 0 || itemIndex >= items.length) throw new Error('Invalid item index');
+  const next = items.filter((_, i) => i !== itemIndex);
+  const cleaned = next.map((item) => {
+    const c: OrderItem = {
+      id: item.id,
+      name: item.name,
+      price: item.price || 0,
+      quantity: item.quantity,
+      // حساب بدقة عالية
+      itemTotal: item.itemTotal ?? PC.multiply(item.quantity, item.price || 0),
+    };
+    if (item.emoji) c.emoji = item.emoji;
+    if (item.note) c.note = item.note;
+    return c;
+  });
+  // حساب بدقة عالية
+  const newTotal = PC.sum(cleaned.map(i => i.itemTotal ?? PC.multiply(i.quantity, i.price)));
+  const itemsCount = cleaned.reduce((s, i) => s + i.quantity, 0);
+  const updates: Record<string, unknown> = {
+    items: cleaned,
+    total: newTotal,
+    itemsCount,
+    updatedAt: new Date().toISOString(),
+  };
+  await update(ref(database, `${getPath('orders')}/${orderId}`), updates);
 };
 
 export const getSalesStats = async (startDate?: Date, endDate?: Date) => {
@@ -948,9 +991,12 @@ export const getSalesStats = async (startDate?: Date, endDate?: Date) => {
     });
   }
   
-  const totalRevenue = filteredOrders
-    .filter((o) => o.status === 'paid' || o.status === 'completed')
-    .reduce((sum, o) => sum + (o.total || 0), 0);
+  // حساب بدقة عالية
+  const totalRevenue = PC.sum(
+    filteredOrders
+      .filter((o) => o.status === 'paid' || o.status === 'completed')
+      .map(o => o.total || 0)
+  );
   
   const ordersCount = filteredOrders.length;
   const paidOrders = filteredOrders.filter((o) => o.status === 'paid' || o.status === 'completed').length;
@@ -961,7 +1007,7 @@ export const getSalesStats = async (startDate?: Date, endDate?: Date) => {
     ordersCount,
     paidOrders,
     itemsSold,
-    averageOrder: ordersCount > 0 ? totalRevenue / paidOrders : 0,
+    averageOrder: paidOrders > 0 ? PC.divide(totalRevenue, paidOrders) : 0,
   };
 };
 
@@ -1059,7 +1105,8 @@ export const createTable = async (table: Omit<Table, 'id'>): Promise<string> => 
 
   const newRef = push(ref(database, getPath('tables')));
   await set(newRef, tableData);
-  return newRef.key!;
+  if (!newRef.key) throw new Error('فشل في إنشاء معرف الطاولة');
+  return newRef.key;
 };
 
 export const updateTable = async (tableId: string, updates: Partial<Table>): Promise<void> => {
@@ -1223,7 +1270,8 @@ export const createRoom = async (room: Omit<Room, 'id'>): Promise<string> => {
   if (room.femalePrice !== undefined) cleanData.femalePrice = room.femalePrice;
   
   await set(newRef, cleanData);
-  return newRef.key!;
+  if (!newRef.key) throw new Error('فشل في إنشاء معرف الغرفة');
+  return newRef.key;
 };
 
 export const updateRoom = async (roomId: string, updates: Partial<Room>): Promise<void> => {
@@ -1285,7 +1333,7 @@ export const getRoomWithOrder = async (roomId: string): Promise<Room | null> => 
 export const getOrdersByRoom = async (roomId: string): Promise<Order[]> => {
   const orders = await getOrders();
   return orders
-    .filter(order => order.roomId === roomId || order.orderType === 'room')
+    .filter(order => order.roomId === roomId)
     .sort((a, b) => {
       const timeA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
       const timeB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
@@ -1322,8 +1370,9 @@ export const createRoomOrder = async (
 
   // Create the order
   const newRef = push(ref(database, getPath('orders')));
+  if (!newRef.key) throw new Error('فشل في إنشاء معرف طلب الغرفة');
   const order: Order = {
-    id: newRef.key!,
+    id: newRef.key,
     ...orderData,
     roomId,
     roomNumber: room.roomNumber,
@@ -1337,9 +1386,9 @@ export const createRoomOrder = async (
   await set(newRef, order);
 
   // Update room status to occupied
-  await setRoomStatus(roomId, 'occupied', newRef.key!);
+  await setRoomStatus(roomId, 'occupied', newRef.key);
 
-  return newRef.key!;
+  return newRef.key;
 };
 
 export const closeRoomOrder = async (orderId: string, roomId: string): Promise<void> => {

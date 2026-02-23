@@ -14,11 +14,11 @@ import {
   Package,
   Users
 } from 'lucide-react';
-
-type ScreenSize = 'mobile' | 'tablet' | 'desktop';
+import { useTranslation } from '@/lib/context/LanguageContext';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
   const [stats, setStats] = useState({
     totalRevenue: 0,
     ordersCount: 0,
@@ -27,20 +27,16 @@ export default function AdminDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
-  const [screenSize, setScreenSize] = useState<ScreenSize>('desktop');
+
+  const [screenSize, setScreenSize] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
 
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
-      if (width < 640) {
-        setScreenSize('mobile');
-      } else if (width < 1024) {
-        setScreenSize('tablet');
-      } else {
-        setScreenSize('desktop');
-      }
+      if (width < 640) setScreenSize('mobile');
+      else if (width < 1024) setScreenSize('tablet');
+      else setScreenSize('desktop');
     };
-    
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -94,9 +90,9 @@ export default function AdminDashboard() {
 
   const allKpiCards = [
     {
-      title: 'إجمالي الإيرادات',
+      title: t.dashboard.totalRevenue,
       value: `${stats.totalRevenue.toFixed(3)}`,
-      unit: 'ر.ع',
+      unit: t.common.currency,
       change: '+12.5%',
       trend: 'up',
       icon: DollarSign,
@@ -105,9 +101,9 @@ export default function AdminDashboard() {
       requiresFinancial: true,
     },
     {
-      title: 'الطلبات اليوم',
+      title: t.dashboard.todayOrders,
       value: stats.ordersCount.toString(),
-      unit: 'طلب',
+      unit: t.dashboard.order,
       change: '+8.2%',
       trend: 'up',
       icon: ShoppingCart,
@@ -116,9 +112,9 @@ export default function AdminDashboard() {
       requiresFinancial: false,
     },
     {
-      title: 'المنتجات النشطة',
+      title: t.dashboard.activeProducts,
       value: stats.productsCount.toString(),
-      unit: 'منتج',
+      unit: t.dashboard.product,
       change: '0%',
       trend: 'neutral',
       icon: Package,
@@ -127,9 +123,9 @@ export default function AdminDashboard() {
       requiresFinancial: false,
     },
     {
-      title: 'الطلبات المدفوعة',
+      title: t.dashboard.paidOrders,
       value: stats.paidOrders.toString(),
-      unit: 'طلب',
+      unit: t.dashboard.order,
       change: '+5.1%',
       trend: 'up',
       icon: Users,
@@ -159,13 +155,13 @@ export default function AdminDashboard() {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      pending: 'معلق',
-      processing: 'قيد التنفيذ',
-      preparing: 'قيد التحضير',
-      ready: 'جاهز',
-      paid: 'مدفوع',
-      completed: 'مكتمل',
-      cancelled: 'ملغي',
+      pending: t.orderStatus.pending,
+      processing: t.orderStatus.processing,
+      preparing: t.orderStatus.preparing,
+      ready: t.orderStatus.ready,
+      paid: t.orderStatus.paid,
+      completed: t.orderStatus.completed,
+      cancelled: t.orderStatus.cancelled,
     };
     return labels[status] || status;
   };
@@ -183,7 +179,7 @@ export default function AdminDashboard() {
             animation: 'spin 1s linear infinite',
             margin: '0 auto',
           }}></div>
-          <p style={{ marginTop: '16px', fontSize: '14px', color: '#64748b' }}>جاري التحميل...</p>
+          <p style={{ marginTop: '16px', fontSize: '14px', color: '#64748b' }}>{t.common.loading}</p>
         </div>
         <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -192,7 +188,7 @@ export default function AdminDashboard() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Topbar title="لوحة التحكم" subtitle="نظرة عامة على الأداء" />
+      <Topbar title={t.dashboard.title} subtitle={language === 'ar' ? 'نظرة عامة على الأداء' : 'Performance Overview'} />
       
       <div style={{ padding: isMobile ? '16px' : isTablet ? '20px' : '24px' }}>
         {/* KPI Cards */}
@@ -267,12 +263,14 @@ export default function AdminDashboard() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '20px 24px',
+            padding: isMobile ? '14px 16px' : '20px 24px',
             borderBottom: '1px solid #e2e8f0',
+            flexWrap: 'wrap',
+            gap: '8px',
           }}>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>آخر الطلبات</h3>
-              <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>آخر 5 طلبات</p>
+              <h3 style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{t.dashboard.recentOrders}</h3>
+              {!isMobile && <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>{t.dashboard.recentOrders}</p>}
             </div>
             <a 
               href="/admin/orders" 
@@ -286,27 +284,28 @@ export default function AdminDashboard() {
                 textDecoration: 'none',
               }}
             >
-              عرض الكل
+              {t.dashboard.viewAll}
               <ArrowUpRight style={{ width: '14px', height: '14px' }} />
             </a>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? '500px' : 'auto' }}>
             <thead>
               <tr style={{ backgroundColor: '#f8fafc' }}>
-                <th style={{ padding: '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>رقم الطلب</th>
-                <th style={{ padding: '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>العميل</th>
+                <th style={{ padding: isMobile ? '10px 12px' : '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{t.cashier.orderNumber}</th>
+                <th style={{ padding: isMobile ? '10px 12px' : '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{t.common.name}</th>
                 {canSeeFinancialData && (
-                  <th style={{ padding: '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>المبلغ</th>
+                  <th style={{ padding: isMobile ? '10px 12px' : '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{t.common.total}</th>
                 )}
-                <th style={{ padding: '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>الحالة</th>
-                <th style={{ padding: '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>الوقت</th>
+                <th style={{ padding: isMobile ? '10px 12px' : '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{t.common.status}</th>
+                <th style={{ padding: isMobile ? '10px 12px' : '14px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{t.common.time}</th>
               </tr>
             </thead>
             <tbody>
               {recentOrders.length === 0 ? (
                 <tr>
                   <td colSpan={canSeeFinancialData ? 5 : 4} style={{ padding: '48px 24px', textAlign: 'center', fontSize: '14px', color: '#64748b' }}>
-                    لا توجد طلبات
+                    {t.dashboard.noOrders}
                   </td>
                 </tr>
               ) : (
@@ -314,32 +313,33 @@ export default function AdminDashboard() {
                   const statusStyle = getStatusStyle(order.status);
                   return (
                     <tr key={order.id} style={{ borderTop: index > 0 ? '1px solid #f1f5f9' : 'none' }}>
-                      <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
+                      <td style={{ padding: isMobile ? '10px 12px' : '16px 24px', fontSize: isMobile ? '12px' : '14px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
                         #{order.id.slice(-6).toUpperCase()}
                       </td>
-                      <td style={{ padding: '16px 24px', fontSize: '14px', color: '#475569' }}>
-                        {order.customerName || order.tableNumber || 'غير محدد'}
+                      <td style={{ padding: isMobile ? '10px 12px' : '16px 24px', fontSize: isMobile ? '12px' : '14px', color: '#475569', whiteSpace: 'nowrap' }}>
+                        {order.customerName || order.tableNumber || '-'}
                       </td>
                       {canSeeFinancialData && (
-                        <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
-                          {order.total.toFixed(3)} ر.ع
+                        <td style={{ padding: isMobile ? '10px 12px' : '16px 24px', fontSize: isMobile ? '12px' : '14px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                          {order.total.toFixed(3)} {t.common.currency}
                         </td>
                       )}
-                      <td style={{ padding: '16px 24px' }}>
+                      <td style={{ padding: isMobile ? '10px 12px' : '16px 24px' }}>
                         <span style={{
                           display: 'inline-flex',
-                          padding: '6px 12px',
+                          padding: isMobile ? '4px 8px' : '6px 12px',
                           borderRadius: '8px',
-                          fontSize: '12px',
+                          fontSize: isMobile ? '11px' : '12px',
                           fontWeight: 600,
                           backgroundColor: statusStyle.bg,
                           color: statusStyle.color,
+                          whiteSpace: 'nowrap',
                         }}>
                           {getStatusLabel(order.status)}
                         </span>
                       </td>
-                      <td style={{ padding: '16px 24px', fontSize: '14px', color: '#64748b' }}>
-                        {order.createdAt ? new Date(order.createdAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                      <td style={{ padding: isMobile ? '10px 12px' : '16px 24px', fontSize: isMobile ? '12px' : '14px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                        {order.createdAt ? new Date(order.createdAt).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : '-'}
                       </td>
                     </tr>
                   );
@@ -347,6 +347,7 @@ export default function AdminDashboard() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

@@ -2,6 +2,8 @@
 
 import { Product, ProductVariation } from '@/lib/firebase/database';
 import { Plus, Minus, Eye, Layers } from 'lucide-react';
+import { useTranslation } from '@/lib/context/LanguageContext';
+import { getLocalizedName, getLocalizedDescription } from '@/lib/utils/localized';
 
 interface ProductCardProps {
   product: Product;
@@ -25,6 +27,7 @@ export default function ProductCard({
   onDecrement,
   onSelectVariation,
 }: ProductCardProps) {
+  const { language } = useTranslation();
   // Check if product has active variations
   const activeVariations = product.variations?.filter(v => v.isActive !== false) || [];
   const hasVariations = activeVariations.length > 0;
@@ -89,7 +92,7 @@ export default function ProductCard({
           backdropFilter: 'blur(4px)',
         }}>
           <Layers style={{ width: '12px', height: '12px' }} />
-          خيارات متعددة
+          {language === 'ar' ? 'خيارات متعددة' : 'Multiple options'}
         </div>
       )}
 
@@ -136,9 +139,9 @@ export default function ProductCard({
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
           }}>
-            {product.name}
+            {getLocalizedName(product, language)}
           </h3>
-          {product.description && (
+          {getLocalizedDescription(product, language) && (
             <p style={{
               fontSize: '12px',
               color: '#64748b',
@@ -148,7 +151,7 @@ export default function ProductCard({
               overflow: 'hidden',
               lineHeight: '1.5',
             }}>
-              {product.description}
+              {getLocalizedDescription(product, language)}
             </p>
           )}
         </div>
@@ -167,7 +170,7 @@ export default function ProductCard({
                 display: 'block',
                 marginBottom: '2px',
               }}>
-                يبدأ من
+                {language === 'ar' ? 'يبدأ من' : 'Starts from'}
               </span>
             )}
             <div style={{

@@ -12,6 +12,7 @@ import {
 } from '@/lib/firebase/database';
 import TableCard from '@/lib/components/tables/TableCard';
 import TableDetailsModal from '@/lib/components/tables/TableDetailsModal';
+import { useTranslation } from '@/lib/context/LanguageContext';
 import { 
   Search, 
   Plus, 
@@ -28,20 +29,21 @@ import {
 
 type ScreenSize = 'mobile' | 'tablet' | 'desktop';
 
-const AREA_OPTIONS = [
-  { value: 'all', label: 'جميع المناطق', icon: Grid3X3 },
-  { value: 'داخلي', label: 'داخلي', icon: Coffee },
-  { value: 'VIP', label: 'VIP', icon: Crown },
-];
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'الكل', icon: Grid3X3, color: '#64748b' },
-  { value: 'available', label: 'متاحة', icon: CheckCircle, color: '#16a34a' },
-  { value: 'reserved', label: 'محجوزة', icon: AlertCircle, color: '#f59e0b' },
-  { value: 'occupied', label: 'مشغولة', icon: XCircle, color: '#dc2626' },
-];
-
 export default function TablesPage() {
+  const { t, language } = useTranslation();
+
+  const AREA_OPTIONS = useMemo(() => [
+    { value: 'all', label: language === 'ar' ? 'جميع المناطق' : 'All Areas', icon: Grid3X3 },
+    { value: 'داخلي', label: language === 'ar' ? 'داخلي' : 'Indoor', icon: Coffee },
+    { value: 'VIP', label: 'VIP', icon: Crown },
+  ], [language]);
+
+  const STATUS_OPTIONS = useMemo(() => [
+    { value: 'all', label: t.common.all, icon: Grid3X3, color: '#64748b' },
+    { value: 'available', label: t.tables.statusAvailable, icon: CheckCircle, color: '#16a34a' },
+    { value: 'reserved', label: t.tables.statusReserved, icon: AlertCircle, color: '#f59e0b' },
+    { value: 'occupied', label: t.tables.statusOccupied, icon: XCircle, color: '#dc2626' },
+  ], [t]);
   const [tables, setTables] = useState<Table[]>([]);
   const [tableOrders, setTableOrders] = useState<Record<string, Order>>({});
   const [loading, setLoading] = useState(true);
@@ -195,10 +197,10 @@ export default function TablesPage() {
       }}>
         <div>
           <h1 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            الطاولات
+            {t.tables.title}
           </h1>
           <p style={{ fontSize: isMobile ? '12px' : '14px', color: '#64748b', marginTop: '4px' }}>
-            إدارة ومتابعة حالة الطاولات
+            {t.tables.subtitle}
           </p>
         </div>
         <div style={{ display: 'flex', gap: isMobile ? '8px' : '12px' }}>
@@ -219,7 +221,7 @@ export default function TablesPage() {
             }}
           >
             <RefreshCw style={{ width: isMobile ? '16px' : '18px', height: isMobile ? '16px' : '18px' }} />
-            {!isMobile && 'تحديث'}
+            {!isMobile && t.common.refresh}
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -238,7 +240,7 @@ export default function TablesPage() {
             }}
           >
             <Plus style={{ width: '18px', height: '18px' }} />
-            إضافة طاولة
+            {t.tables.addTable}
           </button>
         </div>
       </div>
@@ -256,7 +258,7 @@ export default function TablesPage() {
           borderRadius: isMobile ? '12px' : '16px',
           border: '1px solid #e2e8f0',
         }}>
-          <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#64748b', marginBottom: '4px' }}>إجمالي الطاولات</p>
+          <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#64748b', marginBottom: '4px' }}>{language === 'ar' ? 'إجمالي الطاولات' : 'Total Tables'}</p>
           <p style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{stats.total}</p>
         </div>
         <div style={{
@@ -265,7 +267,7 @@ export default function TablesPage() {
           borderRadius: isMobile ? '12px' : '16px',
           border: '1px solid #16a34a',
         }}>
-          <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#16a34a', marginBottom: '4px' }}>متاحة</p>
+          <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#16a34a', marginBottom: '4px' }}>{t.tables.statusAvailable}</p>
           <p style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: 700, color: '#16a34a', margin: 0 }}>{stats.available}</p>
         </div>
         <div style={{
@@ -274,7 +276,7 @@ export default function TablesPage() {
           borderRadius: isMobile ? '12px' : '16px',
           border: '1px solid #f59e0b',
         }}>
-          <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#f59e0b', marginBottom: '4px' }}>محجوزة</p>
+          <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#f59e0b', marginBottom: '4px' }}>{t.tables.statusReserved}</p>
           <p style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: 700, color: '#f59e0b', margin: 0 }}>{stats.reserved}</p>
         </div>
         <div style={{
@@ -283,7 +285,7 @@ export default function TablesPage() {
           borderRadius: isMobile ? '12px' : '16px',
           border: '1px solid #dc2626',
         }}>
-          <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#dc2626', marginBottom: '4px' }}>مشغولة</p>
+          <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#dc2626', marginBottom: '4px' }}>{t.tables.statusOccupied}</p>
           <p style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: 700, color: '#dc2626', margin: 0 }}>{stats.occupied}</p>
         </div>
       </div>
@@ -319,7 +321,7 @@ export default function TablesPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="ابحث برقم الطاولة..."
+                placeholder={language === 'ar' ? 'ابحث برقم الطاولة...' : 'Search by table number...'}
                 style={{
                   flex: 1,
                   border: 'none',
@@ -477,13 +479,13 @@ export default function TablesPage() {
           <Grid3X3 style={{ width: '48px', height: '48px', color: '#cbd5e1', marginBottom: '16px' }} />
           <p style={{ fontSize: '16px', color: '#475569', marginBottom: '8px' }}>
             {searchTerm || filterArea !== 'all' || filterStatus !== 'all' 
-              ? 'لا توجد طاولات تطابق البحث' 
-              : 'لا توجد طاولات'}
+              ? (language === 'ar' ? 'لا توجد طاولات تطابق البحث' : 'No tables match the search') 
+              : t.tables.noTables}
           </p>
           <p style={{ fontSize: '14px', color: '#94a3b8' }}>
             {searchTerm || filterArea !== 'all' || filterStatus !== 'all' 
-              ? 'جرب تغيير الفلاتر' 
-              : 'ابدأ بإضافة طاولة جديدة'}
+              ? (language === 'ar' ? 'جرب تغيير الفلاتر' : 'Try changing the filters') 
+              : (language === 'ar' ? 'ابدأ بإضافة طاولة جديدة' : 'Start by adding a new table')}
           </p>
         </div>
       ) : (
@@ -547,6 +549,7 @@ function AddTableModal({
   onClose: () => void; 
   onSave: (data: any) => Promise<void>;
 }) {
+  const { t, language } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -571,7 +574,7 @@ function AddTableModal({
       });
     } catch (err: any) {
       console.error('Error creating table:', err);
-      setError(err.message || 'حدث خطأ أثناء إضافة الطاولة');
+      setError(err.message || (language === 'ar' ? 'حدث خطأ أثناء إضافة الطاولة' : 'An error occurred while adding the table'));
       setLoading(false);
     }
   };
@@ -607,7 +610,7 @@ function AddTableModal({
           justifyContent: 'space-between',
         }}>
           <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            إضافة طاولة جديدة
+            {t.tables.addTable}
           </h2>
           <button
             onClick={onClose}
@@ -648,13 +651,13 @@ function AddTableModal({
             {/* Table Number */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
-                رقم الطاولة *
+                {t.tables.tableNumber} *
               </label>
               <input
                 type="text"
                 value={formData.tableNumber}
                 onChange={(e) => setFormData({ ...formData, tableNumber: e.target.value })}
-                placeholder="مثال: 1, A1, VIP1"
+                placeholder={language === 'ar' ? 'مثال: 1, A1, VIP1' : 'e.g. 1, A1, VIP1'}
                 required
                 style={{
                   width: '100%',
@@ -670,13 +673,13 @@ function AddTableModal({
             {/* Name */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
-                اسم الطاولة (اختياري)
+                {t.tables.tableName} ({t.common.optional})
               </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="مثال: طاولة الشرفة"
+                placeholder={language === 'ar' ? 'مثال: طاولة الشرفة' : 'e.g. Balcony Table'}
                 style={{
                   width: '100%',
                   padding: '12px 14px',
@@ -691,7 +694,7 @@ function AddTableModal({
             {/* Area - Only داخلي and VIP */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
-                المنطقة *
+                {t.tables.area} *
               </label>
               <select
                 value={formData.area}
@@ -708,7 +711,7 @@ function AddTableModal({
                   cursor: 'pointer',
                 }}
               >
-                <option value="داخلي">داخلي</option>
+                <option value="داخلي">{language === 'ar' ? 'داخلي' : 'Indoor'}</option>
                 <option value="VIP">VIP</option>
               </select>
             </div>
@@ -731,7 +734,7 @@ function AddTableModal({
                 opacity: loading || !formData.tableNumber ? 0.7 : 1,
               }}
             >
-              {loading ? 'جاري الإضافة...' : 'إضافة الطاولة'}
+              {loading ? (language === 'ar' ? 'جاري الإضافة...' : 'Adding...') : t.tables.addTable}
             </button>
             <button
               type="button"
@@ -747,7 +750,7 @@ function AddTableModal({
                 cursor: 'pointer',
               }}
             >
-              إلغاء
+              {t.common.cancel}
             </button>
           </div>
         </form>
